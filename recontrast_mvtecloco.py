@@ -12,8 +12,9 @@ import argparse
 from utils import global_cosine_hm
 import copy
 from tqdm import tqdm
+import os
+from datetime import datetime
 
-# import os
 # from torch.utils.data import DataLoader
 # from dataset import MVTecDataset
 # import torch.backends.cudnn as cudnn
@@ -25,6 +26,14 @@ from tqdm import tqdm
 
 # warnings.filterwarnings("ignore")
 
+timestamp = (
+    datetime.now().strftime("%Y%m%d_%H%M%S")
+    + "_"
+    + str(random.randint(0, 100))
+    + "_"
+    + str(random.randint(0, 100))
+)
+
 
 def train(_class_, args):
     print(_class_)
@@ -35,7 +44,7 @@ def train(_class_, args):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-    total_iters = 2000
+    total_iters = 400  # TODO: 2000
     batch_size = 16
     image_size = 256
     crop_size = 256
@@ -144,7 +153,7 @@ def train(_class_, args):
             if it == total_iters:
                 break
         print("iter [{}/{}], loss:{:.4f}".format(it, total_iters, loss.item()))
-
+    torch.save(model.state_dict(), os.path.join(args.output_dir, f"{_class_}.pth"))
     # visualize(model, test_dataloader, device, _class_=_class_, save_name=args.save_name)
     # return auroc_px, auroc_sp, aupro_px, auroc_px_best, auroc_sp_best, aupro_px_best
 
@@ -155,8 +164,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
     parser.add_argument("--note", type=str, default="")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--output_dir", type=str, default=f"outputs_{timestamp}/")
     args = parser.parse_args()
 
+    os.makedirs(args.output_dir, exist_ok=True)
     item_list = [
         "breakfast_box",
         "juice_bottle",
