@@ -9,11 +9,12 @@ from models.de_resnet import (
 )
 from models.recontrast import ReContrast, ReContrast
 import argparse
-from utils import global_cosine_hm
+
 import copy
 from tqdm import tqdm
 import os
 from datetime import datetime
+from functools import partial
 
 # from torch.utils.data import DataLoader
 # from dataset import MVTecDataset
@@ -33,6 +34,35 @@ timestamp = (
     + "_"
     + str(random.randint(0, 100))
 )
+
+
+def modify_grad(x, inds, factor=0.0):
+    inds = inds.expand_as(x)
+    x[inds] *= factor
+    return x
+
+
+def global_cosine_hm(a, b, alpha=1.0, factor=0.0):
+    cos_loss = torch.nn.CosineSimilarity()
+    loss = 0
+    weight = [1, 1, 1]
+    for item in range(len(a)):
+        a_ = a[item].detach()
+        b_ = b[item]
+        with torch.no_grad():
+            point_dist = 1 - cos_loss(a_, b_).unsqueeze(1)
+        mean_dist = point_dist.mean()
+        std_dist = point_dist.reshape(-1).std()
+
+        loss += (
+            torch.mean(1 - cos_loss(a_.view(a_.shape[0], -1), b_.view(b_.shape[0], -1)))
+            * weight[item]
+        )
+        thresh = mean_dist + alpha * std_dist
+        partial_func = partial(modify_grad, inds=point_dist < thresh, factor=factor)
+        b_.register_hook(partial_func)
+
+    return loss
 
 
 def train(_class_, args):
