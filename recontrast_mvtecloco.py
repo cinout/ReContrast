@@ -74,12 +74,10 @@ def train(_class_, args):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-    total_iters = 400  # TODO: 2000
-    batch_size = 16
-    image_size = 256
+    total_iters = 3000  # default: 2000
     crop_size = 256
 
-    data_transform, _ = get_data_transforms(image_size, crop_size)
+    data_transform, _ = get_data_transforms(args.image_size, crop_size)
     train_path = "datasets/loco/" + _class_ + "/train"
     # test_path = "datasets/mvtec_anomaly_detection/" + _class_
 
@@ -91,15 +89,17 @@ def train(_class_, args):
     #     phase="test",
     # )
     train_dataloader = torch.utils.data.DataLoader(
-        train_data, batch_size=batch_size, shuffle=True, num_workers=4, drop_last=False
+        train_data,
+        batch_size=args.batch_size,
+        shuffle=True,
+        num_workers=4,
+        drop_last=False,
     )
     # test_dataloader = torch.utils.data.DataLoader(
     #     test_data, batch_size=1, shuffle=False, num_workers=1
     # )
 
-    # TODO: change to 100
     encoder, bn = wide_resnet50_2(pretrained=True)
-    # TODO:
     decoder = de_wide_resnet50_2(pretrained=False, output_conv=2)
 
     encoder = encoder.to(device)
@@ -107,7 +107,6 @@ def train(_class_, args):
     decoder = decoder.to(device)
     encoder_freeze = copy.deepcopy(encoder)
 
-    # TODO:
     model = ReContrast(
         encoder=encoder, encoder_freeze=encoder_freeze, bottleneck=bn, decoder=decoder
     )
@@ -142,7 +141,7 @@ def train(_class_, args):
 
             alpha_final = 1
             alpha = min(-3 + (alpha_final - -3) * it / (total_iters * 0.1), alpha_final)
-            # TODO:
+            # TODO: understand
             loss = (
                 global_cosine_hm(en[:3], de[:3], alpha=alpha, factor=0.0) / 2
                 + global_cosine_hm(en[3:], de[3:], alpha=alpha, factor=0.0) / 2
@@ -194,6 +193,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
     parser.add_argument("--note", type=str, default="")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--batch_size", type=int, default=16)
+    parser.add_argument("--image_size", type=int, default=256)
     parser.add_argument("--output_dir", type=str, default=f"outputs_{timestamp}/")
     args = parser.parse_args()
 

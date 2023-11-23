@@ -1,4 +1,5 @@
 python -u recontrast_mvtecloco.py \
+  --batch_size 2 \
   
   # --norm_c \
   # --reduce_channel_dim \
