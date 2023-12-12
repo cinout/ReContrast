@@ -112,6 +112,8 @@ def train(args, seed):
     test_output_dir = os.path.join(
         output_dir, "anomaly_maps", args.dataset, args.subdataset, "test"
     )  # for saving tiff files
+    os.makedirs(train_output_dir)
+    os.makedirs(test_output_dir)
 
     """
     --[STAGE 1]--:
