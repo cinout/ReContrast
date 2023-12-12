@@ -213,20 +213,22 @@ def train(args):
             image = image.unsqueeze(0)
 
             image = image.to(device)  # [bs, 3, 256, 256]
-            target_size = image.shape[-1]
 
             en, de = model(image)
-            anomaly_map = np.zeros((target_size, target_size))
+            anomaly_map = np.zeros((orig_height, orig_width))
             for fs, ft in zip(en, de):
                 a_map = 1 - F.cosine_similarity(fs, ft)
                 a_map = torch.unsqueeze(a_map, dim=1)  # [bs, 1, res, res]
+                print("--A--", a_map.shape)
                 a_map = F.interpolate(
                     a_map,
                     size=(orig_height, orig_width),
                     mode="bilinear",
                     align_corners=True,
                 )
+                print("--B--", a_map.shape)
                 a_map = a_map[0, 0, :, :].to("cpu").detach().numpy()
+                print("--C--", a_map.shape)
                 anomaly_map += a_map
             anomaly_map = gaussian_filter(anomaly_map, sigma=4)
 
@@ -249,7 +251,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size_stg1", type=int, default=16)
     parser.add_argument("--image_size", type=int, default=256)
     parser.add_argument("--iters_stg1", type=int, default=3000)
-    parser.add_argument("--output_dir", type=str, default=f"outputs_{timestamp}/")
+    parser.add_argument("--output_dir", type=str, default=f"outputs_{timestamp}")
     parser.add_argument("--dataset", type=str, default="mvtec_loco")
     parser.add_argument(
         "--subdataset",
@@ -265,9 +267,9 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    os.makedirs(
-        args.output_dir + f"[{subdataset_mapper[args.subdataset]}]"
-    )  # TODO: seed
+    args.output_dir = args.output_dir + f"_[{subdataset_mapper[args.subdataset]}]"
+
+    os.makedirs(args.output_dir)  # TODO: seed
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     train(args)
