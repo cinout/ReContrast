@@ -94,19 +94,23 @@ def transform_data(size):
     return data_transforms
 
 
-def train(args):
-    torch.manual_seed(args.seed)
-    torch.cuda.manual_seed_all(args.seed)
-    np.random.seed(args.seed)
-    random.seed(args.seed)
+def train(args, seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
+    output_dir = args.output_dir + f"_sd{seed}"
+
+    os.makedirs(output_dir)
+
     train_output_dir = os.path.join(
-        args.output_dir, "trainings", args.dataset, args.subdataset
+        output_dir, "trainings", args.dataset, args.subdataset
     )  # for saving models
     test_output_dir = os.path.join(
-        args.output_dir, "anomaly_maps", args.dataset, args.subdataset, "test"
+        output_dir, "anomaly_maps", args.dataset, args.subdataset, "test"
     )  # for saving tiff files
 
     """
@@ -184,11 +188,8 @@ def train(args):
             print(
                 "iter [{}/{}], loss:{:.4f}".format(iter, args.iters_stg1, loss.item())
             )
-    # torch.save(
-    #     model.state_dict(), os.path.join(args.output_dir, f"{args.subdataset}.pth")
-    # )
+    torch.save(model.state_dict(), os.path.join(train_output_dir, f"model_stg1.pth"))
     # visualize(model, test_dataloader, device, _class_=args.subdataset, save_name=args.save_name)
-    # return auroc_px, auroc_sp, aupro_px, auroc_px_best, auroc_sp_best, aupro_px_best
 
     # validation_path = "datasets/loco/" + args.subdataset + "/validation"  # TODO: use it
 
@@ -219,16 +220,13 @@ def train(args):
             for fs, ft in zip(en, de):
                 a_map = 1 - F.cosine_similarity(fs, ft)
                 a_map = torch.unsqueeze(a_map, dim=1)  # [bs, 1, res, res]
-                print("--A--", a_map.shape)
                 a_map = F.interpolate(
                     a_map,
                     size=(orig_height, orig_width),
                     mode="bilinear",
                     align_corners=True,
                 )
-                print("--B--", a_map.shape)
                 a_map = a_map[0, 0, :, :].to("cpu").detach().numpy()
-                print("--C--", a_map.shape)
                 anomaly_map += a_map
             anomaly_map = gaussian_filter(anomaly_map, sigma=4)
 
@@ -247,7 +245,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="")
     parser.add_argument("--note", type=str, default="")
-    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--seeds", type=int, default=[42], nargs="+")
     parser.add_argument("--batch_size_stg1", type=int, default=16)
     parser.add_argument("--image_size", type=int, default=256)
     parser.add_argument("--iters_stg1", type=int, default=3000)
@@ -266,10 +264,8 @@ if __name__ == "__main__":
         help="sub-datasets of Mvtec LOCO",
     )
     args = parser.parse_args()
-
     args.output_dir = args.output_dir + f"_[{subdataset_mapper[args.subdataset]}]"
 
-    os.makedirs(args.output_dir)  # TODO: seed
-
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    train(args)
+    for seed in args.seeds:
+        train(args, seed)
