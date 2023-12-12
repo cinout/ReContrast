@@ -9,9 +9,9 @@
 #SBATCH --qos=gpgpudeeplearn
 #SBATCH --constraint=dlg4|dlg5
 
-#SBATCH --job-name="deb_recontra"
+#SBATCH --job-name="recontra"
 #SBATCH --account=punim1623
-#SBATCH --time=0-01:00:00
+#SBATCH --time=0-10:00:00
 
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
@@ -30,6 +30,7 @@ set -e
 set -x
 
 python -u recontrast_mvtecloco.py \
+  --subdataset breakfast_box \
 
 my-job-stats -a -n -s
 ##
