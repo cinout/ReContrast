@@ -33,7 +33,7 @@ python -u recontrast_mvtecloco.py \
   --batch_size_stg1 2 \
   --iters_stg1 2 \
   --subdataset breakfast_box \
-  --seeds 10 20 30 \
+  --seeds 10 \
 
 my-job-stats -a -n -s
 ##

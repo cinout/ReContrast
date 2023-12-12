@@ -192,7 +192,6 @@ def train(args, seed):
             )
     torch.save(model.state_dict(), os.path.join(train_output_dir, f"model_stg1.pth"))
     # visualize(model, test_dataloader, device, _class_=args.subdataset, save_name=args.save_name)
-
     # validation_path = "datasets/loco/" + args.subdataset + "/validation"  # TODO: use it
 
     """

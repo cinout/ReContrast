@@ -5,7 +5,7 @@ python -u recontrast_mvtecloco.py \
   
   # --norm_c \
   # --reduce_channel_dim \
-  # --seeds 10 20 30 \
+  # --seeds 10 \
 
 # breakfast_box
 # juice_bottle

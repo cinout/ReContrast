@@ -31,7 +31,7 @@ set -x
 
 python -u recontrast_mvtecloco.py \
   --subdataset juice_bottle \
-  --seeds 10 20 30 \
+  --seeds 10 \
 
 my-job-stats -a -n -s
 ##
