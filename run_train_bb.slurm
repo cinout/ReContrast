@@ -31,6 +31,7 @@ set -x
 
 python -u recontrast_mvtecloco.py \
   --subdataset breakfast_box \
+  --seeds 10 20 30 \
 
 my-job-stats -a -n -s
 ##
