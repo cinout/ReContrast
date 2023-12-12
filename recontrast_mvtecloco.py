@@ -251,9 +251,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size_stg1", type=int, default=16)
     parser.add_argument("--image_size", type=int, default=256)
     parser.add_argument("--iters_stg1", type=int, default=3000)
-    parser.add_argument(
-        "--output_dir", type=str, default=f"outputs/outputs_{timestamp}"
-    )
+    parser.add_argument("--output_dir", type=str, default=f"outputs/output_{timestamp}")
     parser.add_argument("--dataset", type=str, default="mvtec_loco")
     parser.add_argument(
         "--subdataset",

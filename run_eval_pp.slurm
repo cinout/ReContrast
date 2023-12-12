@@ -26,8 +26,8 @@ folder_name="stg1_only"
 python -u mvtec_loco_ad_evaluation/evaluate_experiment.py \
   --object_name "pushpins" \
   --dataset_base_dir "./datasets/loco/" \
-  --anomaly_maps_dir "./outputs/${folder_name}/output_${timestamp}/anomaly_maps/mvtec_loco/" \
-  --output_dir "./outputs/${folder_name}/output_${timestamp}/metrics/mvtec_loco/" \
+  --anomaly_maps_dir "./outputs/${folder_name}/outputs_${timestamp}/anomaly_maps/mvtec_loco/" \
+  --output_dir "./outputs/${folder_name}/outputs_${timestamp}/metrics/mvtec_loco/" \
   --timestamp "${timestamp}" \
   --folder_name "${folder_name}" \
   --generate_visual \
