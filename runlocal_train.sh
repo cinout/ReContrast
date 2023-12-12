@@ -1,5 +1,7 @@
 python -u recontrast_mvtecloco.py \
-  --batch_size 2 \
+  --batch_size_stg1 2 \
+  --iters_stg1 2 \
+  --subdataset breakfast_box \
   
   # --norm_c \
   # --reduce_channel_dim \

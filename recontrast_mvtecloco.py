@@ -7,25 +7,17 @@ from models.resnet import wide_resnet50_2
 from models.de_resnet import (
     de_wide_resnet50_2,
 )
-from models.recontrast import ReContrast, ReContrast
+from models.recontrast import ReContrast
 import argparse
-
+from torchvision import transforms
 import copy
 from tqdm import tqdm
+import tifffile
 import os
 from datetime import datetime
 from functools import partial
-
-# from torch.utils.data import DataLoader
-# from dataset import MVTecDataset
-# import torch.backends.cudnn as cudnn
-# from ptflops import get_model_complexity_info
-# from torch.nn import functional as F
-# from functools import partial
-# import warnings
-# import logging
-
-# warnings.filterwarnings("ignore")
+from torch.nn import functional as F
+from scipy.ndimage import gaussian_filter
 
 timestamp = (
     datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -34,6 +26,14 @@ timestamp = (
     + "_"
     + str(random.randint(0, 100))
 )
+
+subdataset_mapper = {
+    "breakfast_box": "bb",
+    "juice_bottle": "jb",
+    "pushpins": "pp",
+    "screw_bag": "sb",
+    "splicing_connectors": "sc",
+}
 
 
 def modify_grad(x, inds, factor=0.0):
@@ -65,8 +65,36 @@ def global_cosine_hm(a, b, alpha=1.0, factor=0.0):
     return loss
 
 
-def train(_class_, args):
-    print(_class_)
+def InfiniteDataloader(loader):
+    iterator = iter(loader)
+    while True:
+        try:
+            yield next(iterator)
+        except StopIteration:
+            iterator = iter(loader)
+
+
+class ImageFolderWithPath(ImageFolder):
+    def __getitem__(self, index):
+        path, target = self.samples[index]
+        sample, target = super().__getitem__(index)
+        return sample, path
+
+
+def transform_data(size):
+    mean_train = [0.485, 0.456, 0.406]
+    std_train = [0.229, 0.224, 0.225]
+    data_transforms = transforms.Compose(
+        [
+            transforms.Resize((size, size)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=mean_train, std=std_train),
+        ]
+    )
+    return data_transforms
+
+
+def train(args):
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed_all(args.seed)
     np.random.seed(args.seed)
@@ -74,46 +102,49 @@ def train(_class_, args):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-    total_iters = 3000  # default: 2000
-    crop_size = 256
+    train_output_dir = os.path.join(
+        args.output_dir, "trainings", args.dataset, args.subdataset
+    )  # for saving models
+    test_output_dir = os.path.join(
+        args.output_dir, "anomaly_maps", args.dataset, args.subdataset, "test"
+    )  # for saving tiff files
 
-    data_transform, _ = get_data_transforms(args.image_size, crop_size)
-    train_path = "datasets/loco/" + _class_ + "/train"
-    # test_path = "datasets/mvtec_anomaly_detection/" + _class_
+    """
+    --[STAGE 1]--:
+    preparing dataset
+    """
 
-    train_data = ImageFolder(root=train_path, transform=data_transform)
-    # test_data = MVTecDataset(
-    #     root=test_path,
-    #     transform=data_transform,
-    #     gt_transform=gt_transform,
-    #     phase="test",
-    # )
+    train_path = "datasets/loco/" + args.subdataset + "/train"
+    train_data = ImageFolder(root=train_path, transform=transform_data(args.image_size))
+    print(f"train image number: {len(train_data)}")
     train_dataloader = torch.utils.data.DataLoader(
         train_data,
-        batch_size=args.batch_size,
+        batch_size=args.batch_size_stg1,
         shuffle=True,
         num_workers=4,
         drop_last=False,
     )
-    # test_dataloader = torch.utils.data.DataLoader(
-    #     test_data, batch_size=1, shuffle=False, num_workers=1
-    # )
+    train_dataloader_infinite = InfiniteDataloader(train_dataloader)
 
+    """
+    --[STAGE 1]--:
+    preparing models
+    """
     encoder, bn = wide_resnet50_2(pretrained=True)
     decoder = de_wide_resnet50_2(pretrained=False, output_conv=2)
-
     encoder = encoder.to(device)
     bn = bn.to(device)
     decoder = decoder.to(device)
     encoder_freeze = copy.deepcopy(encoder)
-
     model = ReContrast(
         encoder=encoder, encoder_freeze=encoder_freeze, bottleneck=bn, decoder=decoder
     )
-    # for m in encoder.modules():
-    #     if isinstance(m, torch.nn.BatchNorm2d):
-    #         m.eps = 1e-8
+    model.train(mode=True, encoder_bn_train=True)
 
+    """
+    --[STAGE 1]--:
+    preparing optimizers
+    """
     optimizer = torch.optim.AdamW(
         list(decoder.parameters()) + list(bn.parameters()),
         lr=2e-3,
@@ -123,68 +154,90 @@ def train(_class_, args):
     optimizer2 = torch.optim.AdamW(
         list(encoder.parameters()), lr=1e-5, betas=(0.9, 0.999), weight_decay=1e-5
     )
-    print("train image number:{}".format(len(train_data)))
-    # print("test image number:{}".format(len(test_data)))
 
-    # auroc_px_best, auroc_sp_best, aupro_px_best = 0, 0, 0
-    it = 0
-    for epoch in tqdm(range(int(np.ceil(total_iters / len(train_dataloader))))):
-        print(f"---epoch: {epoch}---")
-        # encoder batchnorm in eval for these classes.
-        # model.train(encoder_bn_train=_class_ not in ['toothbrush', 'leather', 'grid', 'tile', 'wood', 'screw'])
-        model.train(encoder_bn_train=True)
+    """
+    --[STAGE 1]--:
+    training
+    """
+    tqdm_obj = tqdm(range(args.iters_stg1))
+    alpha_final = 1
+    for iter, (img, label) in zip(tqdm_obj, train_dataloader_infinite):
+        img = img.to(device)
+        en, de = model(img)  # en: {en_freeze, en}, de: {recon_en, recon_en_freeze}
 
-        # loss_list = []
-        for img, label in train_dataloader:
-            img = img.to(device)
-            en, de = model(img)
+        alpha = min(
+            -3 + (alpha_final - -3) * iter / (args.iters_stg1 * 0.1), alpha_final
+        )
 
-            alpha_final = 1
-            alpha = min(-3 + (alpha_final - -3) * it / (total_iters * 0.1), alpha_final)
-            # TODO: understand
-            loss = (
-                global_cosine_hm(en[:3], de[:3], alpha=alpha, factor=0.0) / 2
-                + global_cosine_hm(en[3:], de[3:], alpha=alpha, factor=0.0) / 2
+        loss = (
+            global_cosine_hm(en[:3], de[:3], alpha=alpha, factor=0.0) / 2
+            + global_cosine_hm(en[3:], de[3:], alpha=alpha, factor=0.0) / 2
+        )
+
+        optimizer.zero_grad()
+        optimizer2.zero_grad()
+        loss.backward()
+        optimizer.step()
+        optimizer2.step()
+
+        if iter % 20 == 0:
+            print(
+                "iter [{}/{}], loss:{:.4f}".format(iter, args.iters_stg1, loss.item())
             )
-
-            # loss = global_cosine(en[:3], de[:3], stop_grad=False) / 2 + \
-            #        global_cosine(en[3:], de[3:], stop_grad=False) / 2
-
-            optimizer.zero_grad()
-            optimizer2.zero_grad()
-            loss.backward()
-            # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.5)
-            optimizer.step()
-            optimizer2.step()
-            # loss_list.append(loss.item())
-
-            # if (it + 1) % 250 == 0:
-            #     auroc_px, auroc_sp, aupro_px = evaluation(
-            #         model, test_dataloader, device
-            #     )
-            #     model.train(
-            #         encoder_bn_train=_class_
-            #         not in ["toothbrush", "leather", "grid", "tile", "wood", "screw"]
-            #     )
-
-            #     print(
-            #         "Pixel Auroc:{:.3f}, Sample Auroc:{:.3f}, Pixel Aupro:{:.3}".format(
-            #             auroc_px, auroc_sp, aupro_px
-            #         )
-            #     )
-            #     if auroc_sp >= auroc_sp_best:
-            #         auroc_px_best, auroc_sp_best, aupro_px_best = (
-            #             auroc_px,
-            #             auroc_sp,
-            #             aupro_px,
-            #         )
-            it += 1
-            if it == total_iters:
-                break
-        print("iter [{}/{}], loss:{:.4f}".format(it, total_iters, loss.item()))
-    torch.save(model.state_dict(), os.path.join(args.output_dir, f"{_class_}.pth"))
-    # visualize(model, test_dataloader, device, _class_=_class_, save_name=args.save_name)
+    # torch.save(
+    #     model.state_dict(), os.path.join(args.output_dir, f"{args.subdataset}.pth")
+    # )
+    # visualize(model, test_dataloader, device, _class_=args.subdataset, save_name=args.save_name)
     # return auroc_px, auroc_sp, aupro_px, auroc_px_best, auroc_sp_best, aupro_px_best
+
+    # validation_path = "datasets/loco/" + args.subdataset + "/validation"  # TODO: use it
+
+    """
+    --[EVALUATION]--:
+    create dataloader
+    """
+    test_path = "datasets/loco/" + args.subdataset + "/test"
+    test_data = ImageFolderWithPath(test_path)
+
+    """
+    --[EVALUATION]--:
+    evaluating
+    """
+    model.eval()
+    with torch.no_grad():
+        for raw_image, path in test_data:
+            # path: 'datasets/loco/breakfast_box/test/good/000.png'
+            orig_width = raw_image.width
+            orig_height = raw_image.height
+            image = transform_data(args.image_size)(raw_image)
+            image = image.unsqueeze(0)
+
+            image = image.to(device)  # [bs, 3, 256, 256]
+            target_size = image.shape[-1]
+
+            en, de = model(image)
+            anomaly_map = np.zeros((target_size, target_size))
+            for fs, ft in zip(en, de):
+                a_map = 1 - F.cosine_similarity(fs, ft)
+                a_map = torch.unsqueeze(a_map, dim=1)  # [bs, 1, res, res]
+                a_map = F.interpolate(
+                    a_map,
+                    size=(orig_height, orig_width),
+                    mode="bilinear",
+                    align_corners=True,
+                )
+                a_map = a_map[0, 0, :, :].to("cpu").detach().numpy()
+                anomaly_map += a_map
+            anomaly_map = gaussian_filter(anomaly_map, sigma=4)
+
+            defect_class = os.path.basename(os.path.dirname(path))
+
+            if test_output_dir is not None:
+                img_nm = os.path.split(path)[1].split(".")[0]
+                if not os.path.exists(os.path.join(test_output_dir, defect_class)):
+                    os.makedirs(os.path.join(test_output_dir, defect_class))
+                file = os.path.join(test_output_dir, defect_class, img_nm + ".tiff")
+                tifffile.imwrite(file, anomaly_map)
 
 
 if __name__ == "__main__":
@@ -193,21 +246,28 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
     parser.add_argument("--note", type=str, default="")
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--batch_size", type=int, default=16)
+    parser.add_argument("--batch_size_stg1", type=int, default=16)
     parser.add_argument("--image_size", type=int, default=256)
+    parser.add_argument("--iters_stg1", type=int, default=3000)
     parser.add_argument("--output_dir", type=str, default=f"outputs_{timestamp}/")
+    parser.add_argument("--dataset", type=str, default="mvtec_loco")
+    parser.add_argument(
+        "--subdataset",
+        default="breakfast_box",
+        choices=[
+            "breakfast_box",
+            "juice_bottle",
+            "pushpins",
+            "screw_bag",
+            "splicing_connectors",
+        ],
+        help="sub-datasets of Mvtec LOCO",
+    )
     args = parser.parse_args()
 
-    os.makedirs(args.output_dir, exist_ok=True)
-    item_list = [
-        "breakfast_box",
-        "juice_bottle",
-        "pushpins",
-        "screw_bag",
-        "splicing_connectors",
-    ]
+    os.makedirs(
+        args.output_dir + f"[{subdataset_mapper[args.subdataset]}]"
+    )  # TODO: seed
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-
-    for item in item_list:
-        train(item, args)
+    train(args)

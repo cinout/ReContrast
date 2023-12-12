@@ -68,6 +68,7 @@ def global_cosine(a, b, stop_grad=True):
 
 
 def global_cosine_hm(a, b, alpha=1.0, factor=0.0):
+    # hard mining
     cos_loss = torch.nn.CosineSimilarity()
     loss = 0
     weight = [1, 1, 1]
