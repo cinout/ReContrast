@@ -46,8 +46,7 @@ def predict(
     image,
     model_stg2,
     ref_features,
-    orig_height,
-    orig_width,
+    args,
     q_structure_start=None,
     q_structure_end=None,
     q_logic_start=None,
@@ -58,16 +57,15 @@ def predict(
     )
 
     map_logic = pred_mask[:, 1, :, :].unsqueeze(1)
-    map_logic = F.interpolate(map_logic, (orig_height, orig_width), mode="bilinear")
 
-    map_structure = torch.zeros((1, 1, orig_height, orig_width))
+    map_structure = torch.zeros((1, 1, args.image_size, args.image_size))
     map_structure = map_structure.to(device)
     for fs, ft in zip(en, de):
         a_map = 1 - F.cosine_similarity(fs, ft)
         a_map = torch.unsqueeze(a_map, dim=1)  # [1, 1, res, res]
         a_map = F.interpolate(
             a_map,
-            size=(orig_height, orig_width),
+            size=(args.image_size, args.image_size),
             mode="bilinear",
             align_corners=True,
         )
@@ -441,8 +439,8 @@ def train(args, seed):
             image = image.unsqueeze(0)
             image = image.to(device)  # [bs, 3, 256, 256]
 
-            map_combined, map_structure, map_logic = predict(
-                image, model_stg2, ref_features, orig_height, orig_width
+            _, map_structure, map_logic = predict(
+                image, model_stg2, ref_features, args
             )
 
             maps_structure.append(map_structure)
@@ -476,10 +474,20 @@ def train(args, seed):
             image = image.unsqueeze(0)
             image = image.to(device)  # [bs, 3, 256, 256]
 
-            map_combined, map_structure, map_logic = predict(
-                image, model_stg2, ref_features, orig_height, orig_width
+            map_combined, _, _ = predict(
+                image,
+                model_stg2,
+                ref_features,
+                args,
+                q_structure_start=q_structure_start,
+                q_structure_end=q_structure_end,
+                q_logic_start=q_logic_start,
+                q_logic_end=q_logic_end,
             )
 
+            map_combined = F.interpolate(
+                map_combined, (orig_height, orig_width), mode="bilinear"
+            )
             map_combined = (
                 map_combined[0, 0].cpu().numpy()
             )  # ready to be saved into .tiff format
