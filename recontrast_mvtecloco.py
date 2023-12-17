@@ -61,6 +61,7 @@ def predict(
     map_logic = F.interpolate(map_logic, (orig_height, orig_width), mode="bilinear")
 
     map_structure = torch.zeros((1, 1, orig_height, orig_width))
+    map_structure = map_structure.to(device)
     for fs, ft in zip(en, de):
         a_map = 1 - F.cosine_similarity(fs, ft)
         a_map = torch.unsqueeze(a_map, dim=1)  # [1, 1, res, res]
