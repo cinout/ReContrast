@@ -32,6 +32,7 @@ set -x
 python -u recontrast_mvtecloco.py \
   --subdataset pushpins \
   --seeds 10 \
+  --stg1_ckpt outputs/stg1_only/outputs_20231212_234343_87_4_[pp]_sd10/trainings/mvtec_loco/pushpins/model_stg1.pth \
 
 my-job-stats -a -n -s
 ##

@@ -18,17 +18,60 @@ from scipy.ndimage import gaussian_filter
 import os
 from functools import partial
 import math
+from tqdm import tqdm
 
-# from dataset import get_data_transforms
-# from torchvision.datasets import ImageFolder
-# from torch.utils.data import DataLoader
-# from dataset import MVTecDataset
-# import matplotlib.pyplot as plt
-# from sklearn import manifold
-# from matplotlib.ticker import NullFormatter
-# from scipy.spatial.distance import pdist
-# import matplotlib
-# import pickle
+
+class FocalLoss(torch.nn.Module):
+    """
+    copy from: https://github.com/Hsuxu/Loss_ToolBox-PyTorch/blob/master/FocalLoss/FocalLoss.py
+
+    'Focal Loss for Dense Object Detection. (https://arxiv.org/abs/1708.02002)'
+        Focal_Loss= -1*alpha*(1-pt)*log(pt)
+    """
+
+    def __init__(self):
+        super(FocalLoss, self).__init__()
+        self.gamma = 2
+        self.smooth = 1e-5
+        self.size_average = True
+
+    def forward(self, logit, target):
+        # logit.shape: [bs, 2, h, w], sum of dim 1 is 1, because softmaxed
+        # target.shape: [bs, 1, h, w], values are either 0 or 1, in float data type
+        num_class = logit.shape[1]
+
+        if logit.dim() > 2:
+            # N,C,d1,d2 -> N,C,m (m=d1*d2*...)
+            logit = logit.view(logit.size(0), logit.size(1), -1)
+            logit = logit.permute(0, 2, 1).contiguous()
+            logit = logit.view(-1, logit.size(-1))  # flatten to [N*h*w, C]
+        target = torch.squeeze(target, 1)
+        target = target.view(-1, 1)  # [N*h*w, 1]
+
+        idx = target.cpu().long()  # [N*h*w, 1]
+
+        one_hot_key = torch.FloatTensor(
+            target.size(0), num_class
+        ).zero_()  # [N*h*w, C], all 0s
+        one_hot_key = one_hot_key.scatter_(
+            1, idx, 1
+        )  # [N*h*w, C], with the right C marked with 1, and the other marked with 0
+        if one_hot_key.device != logit.device:
+            one_hot_key = one_hot_key.to(logit.device)
+
+        if self.smooth:
+            one_hot_key = torch.clamp(
+                one_hot_key, self.smooth / (num_class - 1), 1.0 - self.smooth
+            )  # with values changed from {0, 1} to {smooth, 1-smooth}
+
+        pt = (one_hot_key * logit).sum(1) + self.smooth
+        logpt = pt.log()
+
+        loss = -1 * torch.pow((1 - pt), self.gamma) * logpt
+
+        if self.size_average:
+            loss = loss.mean()
+        return loss
 
 
 def modify_grad(x, inds, factor=0.0):
