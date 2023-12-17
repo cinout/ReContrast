@@ -450,6 +450,11 @@ def train(args, seed):
         q_logic_start = torch.quantile(maps_logic, q=0.9)
         q_logic_end = torch.quantile(maps_logic, q=0.995)
 
+    print(f"q_structure_start: {q_structure_start}")
+    print(f"q_structure_end: {q_structure_end}")
+    print(f"q_logic_start: {q_logic_start}")
+    print(f"q_logic_end: {q_logic_end}")
+
     """
     --[EVALUATION]--:
     create dataloader
@@ -472,22 +477,32 @@ def train(args, seed):
             image = image.unsqueeze(0)
             image = image.to(device)  # [bs, 3, 256, 256]
 
-            map_combined, _, _ = predict(
-                image,
-                model_stg2,
-                ref_features,
-                args,
-                q_structure_start=q_structure_start,
-                q_structure_end=q_structure_end,
-                q_logic_start=q_logic_start,
-                q_logic_end=q_logic_end,
-            )
+            # TODO: just for debugging
+            if args.use_validation:
+                map_combined, map_structure, map_logic = predict(
+                    image,
+                    model_stg2,
+                    ref_features,
+                    args,
+                    q_structure_start=q_structure_start,
+                    q_structure_end=q_structure_end,
+                    q_logic_start=q_logic_start,
+                    q_logic_end=q_logic_end,
+                )
+            else:
+                map_combined, map_structure, map_logic = predict(
+                    image,
+                    model_stg2,
+                    ref_features,
+                    args,
+                )
 
-            map_combined = F.interpolate(
-                map_combined, (orig_height, orig_width), mode="bilinear"
+            # TODO: revert to map_combined in the future
+            map_structure = F.interpolate(
+                map_structure, (orig_height, orig_width), mode="bilinear"
             )
-            map_combined = (
-                map_combined[0, 0].cpu().numpy()
+            map_structure = (
+                map_structure[0, 0].cpu().numpy()
             )  # ready to be saved into .tiff format
 
             defect_class = os.path.basename(os.path.dirname(path))
@@ -497,7 +512,7 @@ def train(args, seed):
                 if not os.path.exists(os.path.join(test_output_dir, defect_class)):
                     os.makedirs(os.path.join(test_output_dir, defect_class))
                 file = os.path.join(test_output_dir, defect_class, img_nm + ".tiff")
-                tifffile.imwrite(file, map_combined)
+                tifffile.imwrite(file, map_structure)
 
 
 if __name__ == "__main__":
@@ -531,6 +546,7 @@ if __name__ == "__main__":
         help="sub-datasets of Mvtec LOCO",
     )
     parser.add_argument("--stg1_ckpt", type=str)
+    parser.add_argument("--use_validation", action="store_true")
 
     args = parser.parse_args()
     args.output_dir = args.output_dir + f"_[{subdataset_mapper[args.subdataset]}]"
