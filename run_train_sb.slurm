@@ -11,7 +11,7 @@
 
 #SBATCH --job-name="recontra"
 #SBATCH --account=punim1623
-#SBATCH --time=0-15:00:00
+#SBATCH --time=0-6:00:00
 
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1

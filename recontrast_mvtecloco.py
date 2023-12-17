@@ -439,9 +439,7 @@ def train(args, seed):
             image = image.unsqueeze(0)
             image = image.to(device)  # [bs, 3, 256, 256]
 
-            _, map_structure, map_logic = predict(
-                image, model_stg2, ref_features, args
-            )
+            _, map_structure, map_logic = predict(image, model_stg2, ref_features, args)
 
             maps_structure.append(map_structure)
             maps_logic.append(map_logic)
@@ -536,6 +534,10 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     args.output_dir = args.output_dir + f"_[{subdataset_mapper[args.subdataset]}]"
+
+    print(
+        "\n".join("%s: %s" % (k, str(v)) for k, v in sorted(dict(vars(args)).items()))
+    )
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     for seed in args.seeds:
