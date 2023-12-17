@@ -11,7 +11,7 @@
 
 #SBATCH --job-name="deb_recontra"
 #SBATCH --account=punim1623
-#SBATCH --time=0-01:00:00
+#SBATCH --time=0-00:30:00
 
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
@@ -30,10 +30,10 @@ set -e
 set -x
 
 python -u recontrast_mvtecloco.py \
-  --batch_size_stg1 2 \
-  --iters_stg1 2 \
   --subdataset breakfast_box \
   --seeds 10 \
+  --stg1_ckpt outputs/stg1_only/outputs_20231212_234313_77_49_[bb]_sd10/trainings/mvtec_loco/breakfast_box/model_stg1.pth \
+  --iters_stg2 10 \
 
 my-job-stats -a -n -s
 ##
