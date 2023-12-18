@@ -415,6 +415,8 @@ def train(args, seed):
     # TODO: debug hack code, remove later
     model_stg2.eval()
     with torch.no_grad():
+        test_path = "datasets/loco/" + args.subdataset + "/test"
+        test_data = ImageFolderWithPath(test_path)
         # ref_dataloader = torch.utils.data.DataLoader(
         #     train_data,
         #     batch_size=math.floor(len(train_data) * 0.1),
