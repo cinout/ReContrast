@@ -243,13 +243,21 @@ def train(args, seed):
         )
     else:
         # TODO: for debugging, remove this else condition later
-        model_stg1_dict = torch.load(args.stg1_ckpt, map_location=device)
+        encoder, bn = wide_resnet50_2(pretrained=False)
+        encoder = encoder.to(device)
+        bn = bn.to(device)
+        encoder_freeze = copy.deepcopy(encoder)
+
+        decoder = de_wide_resnet50_2(pretrained=False, output_conv=2)
+        decoder = decoder.to(device)
+
         model_stg1 = ReContrast(
             encoder=encoder,
             encoder_freeze=encoder_freeze,
             bottleneck=bn,
             decoder=decoder,
         )
+        model_stg1_dict = torch.load(args.stg1_ckpt, map_location=device)
         model_stg1.load_state_dict(model_stg1_dict)
         model_stg1 = model_stg1.to(device)
         model_stg1.eval()
