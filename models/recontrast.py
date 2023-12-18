@@ -186,6 +186,11 @@ class LogicalMaskProducer(nn.Module):
         self.encoder_freeze = encoder_freeze
         self.decoder = decoder
 
+        self.encoder.layer4 = None
+        self.encoder.fc = None
+        self.encoder_freeze.layer4 = None
+        self.encoder_freeze.fc = None
+
         # from stg2
         self.channel_reducer = nn.Linear(in_features=2048, out_features=512)
         self.self_att_module = nn.ModuleList(
