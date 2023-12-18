@@ -20,8 +20,8 @@ module purge
 eval "$(conda shell.bash hook)"
 conda activate eff
 
-timestamp="20231218_002843_69_94_[bb]_sd10"
-folder_name="stg2"
+timestamp="20231218_101127_12_80_[bb]_sd10" ## no validation
+folder_name="stg2_debug"
 
 python -u mvtec_loco_ad_evaluation/evaluate_experiment.py \
   --object_name "breakfast_box" \
