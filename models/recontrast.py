@@ -198,6 +198,16 @@ class LogicalMaskProducer(nn.Module):
         )
         self.deconv = DeConv()
 
+        # prevent gradients
+        for component in [
+            self.encoder,
+            self.encoder_freeze,
+            self.bottleneck,
+            self.decoder,
+        ]:
+            for param in component.parameters():
+                param.requires_grad = False
+
     def forward(self, x, get_ref_features=False, ref_features=None):
         # x.shape: [bs, 3, 256, 256]
 

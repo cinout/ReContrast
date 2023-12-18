@@ -241,83 +241,83 @@ def train(args, seed):
         torch.save(
             model_stg1.state_dict(), os.path.join(train_output_dir, f"model_stg1.pth")
         )
-    else:
-        # TODO: for debugging, remove this else condition later
-        encoder, bn = wide_resnet50_2(pretrained=False)
-        encoder = encoder.to(device)
-        bn = bn.to(device)
-        encoder_freeze = copy.deepcopy(encoder)
+    # else:
+    #     #for debugging, remove this else condition later
+    #     encoder, bn = wide_resnet50_2(pretrained=False)
+    #     encoder = encoder.to(device)
+    #     bn = bn.to(device)
+    #     encoder_freeze = copy.deepcopy(encoder)
 
-        decoder = de_wide_resnet50_2(pretrained=False, output_conv=2)
-        decoder = decoder.to(device)
+    #     decoder = de_wide_resnet50_2(pretrained=False, output_conv=2)
+    #     decoder = decoder.to(device)
 
-        model_stg1 = ReContrast(
-            encoder=encoder,
-            encoder_freeze=encoder_freeze,
-            bottleneck=bn,
-            decoder=decoder,
-        )
-        model_stg1_dict = torch.load(args.stg1_ckpt, map_location=device)
-        model_stg1.load_state_dict(model_stg1_dict)
-        model_stg1 = model_stg1.to(device)
-        model_stg1.eval()
-        with torch.no_grad():
-            test_path = "datasets/loco/" + args.subdataset + "/test"
-            test_data = ImageFolderWithPath(test_path)
+    #     model_stg1 = ReContrast(
+    #         encoder=encoder,
+    #         encoder_freeze=encoder_freeze,
+    #         bottleneck=bn,
+    #         decoder=decoder,
+    #     )
+    #     model_stg1_dict = torch.load(args.stg1_ckpt, map_location=device)
+    #     model_stg1.load_state_dict(model_stg1_dict)
+    #     model_stg1 = model_stg1.to(device)
+    #     model_stg1.eval()
+    #     with torch.no_grad():
+    #         test_path = "datasets/loco/" + args.subdataset + "/test"
+    #         test_data = ImageFolderWithPath(test_path)
 
-            for raw_image, path in test_data:
-                # path: 'datasets/loco/breakfast_box/test/good/000.png'
-                orig_width = raw_image.width
-                orig_height = raw_image.height
-                image = transform_data(args.image_size)(raw_image)
-                image = image.unsqueeze(0)
-                image = image.to(device)  # [bs, 3, 256, 256]
+    #         for raw_image, path in test_data:
+    #             # path: 'datasets/loco/breakfast_box/test/good/000.png'
+    #             orig_width = raw_image.width
+    #             orig_height = raw_image.height
+    #             image = transform_data(args.image_size)(raw_image)
+    #             image = image.unsqueeze(0)
+    #             image = image.to(device)  # [bs, 3, 256, 256]
 
-                """
-                # replacement of predict() function
-                """
+    #             """
+    #             # replacement of predict() function
+    #             """
 
-                en, de = model_stg1(image)
+    #             en, de = model_stg1(image)
 
-                map_structure = torch.zeros((1, 1, args.image_size, args.image_size))
-                map_structure = map_structure.to(device)
-                for fs, ft in zip(en, de):
-                    a_map = 1 - F.cosine_similarity(fs, ft)
-                    a_map = torch.unsqueeze(a_map, dim=1)  # [1, 1, res, res]
-                    a_map = F.interpolate(
-                        a_map,
-                        size=(args.image_size, args.image_size),
-                        mode="bilinear",
-                        align_corners=True,
-                    )
-                    map_structure += a_map
-                map_structure = gaussian_filter(
-                    map_structure.to("cpu").detach().numpy(), sigma=4
-                )
-                map_structure = torch.tensor(map_structure)
-                map_structure = map_structure.to(device)
+    #             map_structure = torch.zeros((1, 1, args.image_size, args.image_size))
+    #             map_structure = map_structure.to(device)
+    #             for fs, ft in zip(en, de):
+    #                 a_map = 1 - F.cosine_similarity(fs, ft)
+    #                 a_map = torch.unsqueeze(a_map, dim=1)  # [1, 1, res, res]
+    #                 a_map = F.interpolate(
+    #                     a_map,
+    #                     size=(args.image_size, args.image_size),
+    #                     mode="bilinear",
+    #                     align_corners=True,
+    #                 )
+    #                 map_structure += a_map
+    #             map_structure = gaussian_filter(
+    #                 map_structure.to("cpu").detach().numpy(), sigma=4
+    #             )
+    #             map_structure = torch.tensor(map_structure)
+    #             map_structure = map_structure.to(device)
 
-                """
-                # END of replacement
-                """
+    #             """
+    #             # END of replacement
+    #             """
 
-                map_structure = F.interpolate(
-                    map_structure, (orig_height, orig_width), mode="bilinear"
-                )
-                map_structure = (
-                    map_structure[0, 0].cpu().numpy()
-                )  # ready to be saved into .tiff format
+    #             map_structure = F.interpolate(
+    #                 map_structure, (orig_height, orig_width), mode="bilinear"
+    #             )
+    #             map_structure = (
+    #                 map_structure[0, 0].cpu().numpy()
+    #             )  # ready to be saved into .tiff format
 
-                defect_class = os.path.basename(os.path.dirname(path))
+    #             defect_class = os.path.basename(os.path.dirname(path))
 
-                if test_output_dir is not None:
-                    img_nm = os.path.split(path)[1].split(".")[0]
-                    if not os.path.exists(os.path.join(test_output_dir, defect_class)):
-                        os.makedirs(os.path.join(test_output_dir, defect_class))
-                    file = os.path.join(test_output_dir, defect_class, img_nm + ".tiff")
-                    tifffile.imwrite(file, map_structure)
+    #             if test_output_dir is not None:
+    #                 img_nm = os.path.split(path)[1].split(".")[0]
+    #                 if not os.path.exists(os.path.join(test_output_dir, defect_class)):
+    #                     os.makedirs(os.path.join(test_output_dir, defect_class))
+    #                 file = os.path.join(test_output_dir, defect_class, img_nm + ".tiff")
+    #                 tifffile.imwrite(file, map_structure)
 
-        exit()
+    #     exit()
 
     """
     --[STAGE 2]--:
@@ -398,12 +398,6 @@ def train(args, seed):
     )  # because layer4 is not used
     bottleneck.load_state_dict(pretrained_bottleneck)
     decoder.load_state_dict(pretrained_decoder)
-
-    # prevent loss gradients
-    # TODO: move them to __init__ of LogicalMaskProducer class
-    for component in [encoder, encoder_freeze, bottleneck, decoder]:
-        for param in component.parameters():
-            param.requires_grad = False
 
     encoder = encoder.to(device)
     encoder_freeze = encoder_freeze.to(device)
