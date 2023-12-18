@@ -9,10 +9,9 @@
 #SBATCH --account=punim1623
 #SBATCH --time=0-01:10:00
 
-
-
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
+#SBATCH --gres=gpu:1
 
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=40G
