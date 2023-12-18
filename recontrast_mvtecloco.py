@@ -458,7 +458,7 @@ def train(args, seed):
             map_structure = gaussian_filter(
                 map_structure.to("cpu").detach().numpy(), sigma=4
             )
-            map_structure = torch.tensor(map_structure, dtype=map_logic.dtype)
+            map_structure = torch.tensor(map_structure)
             map_structure = map_structure.to(device)
 
             """
