@@ -282,42 +282,48 @@ class LogicalMaskProducer(nn.Module):
                 de = [a.chunk(dim=0, chunks=2) for a in de]
                 de = [de[0][0], de[1][0], de[2][0], de[3][1], de[4][1], de[5][1]]
 
-                # logical branch
-                y = self.bottleneck(en)
-                y = y.permute(0, 2, 3, 1)
-                y = self.channel_reducer(y)
-                y = y.permute(0, 3, 1, 2)
-
-                B, C, H, W = y.shape
-                y = y.reshape(B, C, -1)
-                y = y.permute(0, 2, 1)
-                for blk in self.self_att_module:
-                    y = blk(y, H, W)
-                y = y.permute(0, 1, 2)
-                y = y.reshape(B, C, H, W)  # [1, 512, 8, 8]
-
-                assert ref_features is not None, "ref_features should not be None"
-                num_ref = ref_features.shape[0]
-                max_sim = -1000
-                max_index = None
-
-                for i in range(num_ref):
-                    ref = ref_features[i]
-                    sim = F.cosine_similarity(ref, y[0], dim=0).mean()
-                    if sim > max_sim:
-                        max_sim = sim
-                        max_index = i
-                intermediate_input = torch.cat(
-                    [ref_features[max_index], y[0]]
-                ).unsqueeze(0)
-                pred_mask = self.deconv(intermediate_input)
-                pred_mask = torch.softmax(pred_mask, dim=1)
-
                 return (
                     en_freeze + en,
                     de,
-                    pred_mask,
-                )  # de's first half is recons of en, second half is recons of en_freeze
+                )
+
+                # TODO: uncomment them
+                # # logical branch
+                # y = self.bottleneck(en)
+                # y = y.permute(0, 2, 3, 1)
+                # y = self.channel_reducer(y)
+                # y = y.permute(0, 3, 1, 2)
+
+                # B, C, H, W = y.shape
+                # y = y.reshape(B, C, -1)
+                # y = y.permute(0, 2, 1)
+                # for blk in self.self_att_module:
+                #     y = blk(y, H, W)
+                # y = y.permute(0, 1, 2)
+                # y = y.reshape(B, C, H, W)  # [1, 512, 8, 8]
+
+                # assert ref_features is not None, "ref_features should not be None"
+                # num_ref = ref_features.shape[0]
+                # max_sim = -1000
+                # max_index = None
+
+                # for i in range(num_ref):
+                #     ref = ref_features[i]
+                #     sim = F.cosine_similarity(ref, y[0], dim=0).mean()
+                #     if sim > max_sim:
+                #         max_sim = sim
+                #         max_index = i
+                # intermediate_input = torch.cat(
+                #     [ref_features[max_index], y[0]]
+                # ).unsqueeze(0)
+                # pred_mask = self.deconv(intermediate_input)
+                # pred_mask = torch.softmax(pred_mask, dim=1)
+
+                # return (
+                #     en_freeze + en,
+                #     de,
+                #     pred_mask,
+                # )  # de's first half is recons of en, second half is recons of en_freeze
 
 
 class ReContrast(nn.Module):

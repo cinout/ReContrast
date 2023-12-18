@@ -280,7 +280,7 @@ def train(args, seed):
 
     """
     --[STAGE 2]--:
-    preparing model, including (1) freeze the stg1, (2) attention module, (3) DeConv module, (4) Clustering
+    preparing model, including (1) freeze the stg1, (2) attention module, (3) DeConv module
     """
 
     (
@@ -323,6 +323,7 @@ def train(args, seed):
     decoder.load_state_dict(pretrained_decoder)
 
     # prevent loss gradients
+    # TODO: move them to __init__ of LogicalMaskProducer class
     for component in [encoder, encoder_freeze, bottleneck, decoder]:
         for param in component.parameters():
             param.requires_grad = False
@@ -340,70 +341,145 @@ def train(args, seed):
     )
     model_stg2 = model_stg2.to(device)
 
-    """
-    --[STAGE 2]--:
-    preparing optimizer
-    """
-    optimizer = torch.optim.AdamW(
-        list(model_stg2.channel_reducer.parameters())
-        + list(model_stg2.self_att_module.parameters())
-        + list(model_stg2.deconv.parameters()),
-        lr=2e-3,
-        betas=(0.9, 0.999),
-        weight_decay=1e-5,
-    )
-
-    """
-    --[STAGE 2]--:
-    training
-    """
-    tqdm_obj = tqdm(range(args.iters_stg2))
-    model_stg2.train()
-    loss_focal = FocalLoss()
-    for iter, refs, logicano, normal in zip(
-        tqdm_obj,
-        train_ref_dataloader_infinite,
-        logicano_dataloader_infinite,
-        normal_dataloader_infinite,
-    ):
-        ref_images, label1 = refs
-        normal_image, label2 = normal
-        logicano_image = logicano["image"]
-        logicano_gt = logicano["gt"]
-        _, _, orig_height, orig_width = logicano_gt.shape
-        normal_gt = torch.zeros(
-            size=(1, 1, orig_height, orig_width), dtype=logicano_gt.dtype
+    if args.stg2_ckpt is None:
+        """
+        --[STAGE 2]--:
+        preparing optimizer
+        """
+        optimizer = torch.optim.AdamW(
+            list(model_stg2.channel_reducer.parameters())
+            + list(model_stg2.self_att_module.parameters())
+            + list(model_stg2.deconv.parameters()),
+            lr=2e-3,
+            betas=(0.9, 0.999),
+            weight_decay=1e-5,
         )
 
-        ref_images = ref_images.to(device)
-        normal_image = normal_image.to(device)
-        logicano_image = logicano_image.to(device)
-        logicano_gt = logicano_gt.to(device)
-        normal_gt = normal_gt.to(device)
-
-        image_batch = torch.cat([ref_images, normal_image, logicano_image])
-        predicted_masks = model_stg2(
-            image_batch
-        )  # [2, 2, 256, 256], (1) logical_ano, (2) normal, both softmaxed
-        predicted_masks = F.interpolate(
-            predicted_masks, (orig_height, orig_width), mode="bilinear"
-        )
-        gt_masks = torch.cat([logicano_gt, normal_gt], dim=0)  # [2, 1, 256, 256]
-
-        # TODO: [LATER] add other loss functions?
-        loss = loss_focal(predicted_masks, gt_masks)
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-        if iter % 50 == 0:
-            print(
-                "iter [{}/{}], loss:{:.4f}".format(iter, args.iters_stg2, loss.item())
+        """
+        --[STAGE 2]--:
+        training
+        """
+        tqdm_obj = tqdm(range(args.iters_stg2))
+        model_stg2.train()
+        loss_focal = FocalLoss()
+        for iter, refs, logicano, normal in zip(
+            tqdm_obj,
+            train_ref_dataloader_infinite,
+            logicano_dataloader_infinite,
+            normal_dataloader_infinite,
+        ):
+            ref_images, label1 = refs
+            normal_image, label2 = normal
+            logicano_image = logicano["image"]
+            logicano_gt = logicano["gt"]
+            _, _, orig_height, orig_width = logicano_gt.shape
+            normal_gt = torch.zeros(
+                size=(1, 1, orig_height, orig_width), dtype=logicano_gt.dtype
             )
 
-    torch.save(
-        model_stg2.state_dict(), os.path.join(train_output_dir, f"model_stg2.pth")
-    )
+            ref_images = ref_images.to(device)
+            normal_image = normal_image.to(device)
+            logicano_image = logicano_image.to(device)
+            logicano_gt = logicano_gt.to(device)
+            normal_gt = normal_gt.to(device)
+
+            image_batch = torch.cat([ref_images, normal_image, logicano_image])
+            predicted_masks = model_stg2(
+                image_batch
+            )  # [2, 2, 256, 256], (1) logical_ano, (2) normal, both softmaxed
+            predicted_masks = F.interpolate(
+                predicted_masks, (orig_height, orig_width), mode="bilinear"
+            )
+            gt_masks = torch.cat([logicano_gt, normal_gt], dim=0)  # [2, 1, 256, 256]
+
+            # TODO: [LATER] add other loss functions?
+            loss = loss_focal(predicted_masks, gt_masks)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            if iter % 50 == 0:
+                print(
+                    "iter [{}/{}], loss:{:.4f}".format(
+                        iter, args.iters_stg2, loss.item()
+                    )
+                )
+
+        torch.save(
+            model_stg2.state_dict(), os.path.join(train_output_dir, f"model_stg2.pth")
+        )
+    else:
+        model_stg2_dict = torch.load(args.stg2_ckpt, map_location=device)
+        model_stg2.load_state_dict(model_stg2_dict)
+
+    # TODO: debug hack code, remove later
+    model_stg2.eval()
+    with torch.no_grad():
+        # ref_dataloader = torch.utils.data.DataLoader(
+        #     train_data,
+        #     batch_size=math.floor(len(train_data) * 0.1),
+        #     shuffle=True,
+        #     num_workers=4,
+        #     drop_last=False,
+        # )
+        # for imgs, label in ref_dataloader:
+        #     imgs = imgs.to(device)
+        #     ref_features = model_stg2(imgs, get_ref_features=True)  # [10%, 512, 8, 8]
+        #     break  # we just need the first 10%
+
+        for raw_image, path in test_data:
+            # path: 'datasets/loco/breakfast_box/test/good/000.png'
+            orig_width = raw_image.width
+            orig_height = raw_image.height
+            image = transform_data(args.image_size)(raw_image)
+            image = image.unsqueeze(0)
+            image = image.to(device)  # [bs, 3, 256, 256]
+
+            """
+            # replacement of predict() function
+            """
+
+            en, de = model_stg2(image, get_ref_features=False)
+
+            map_structure = torch.zeros((1, 1, args.image_size, args.image_size))
+            map_structure = map_structure.to(device)
+            for fs, ft in zip(en, de):
+                a_map = 1 - F.cosine_similarity(fs, ft)
+                a_map = torch.unsqueeze(a_map, dim=1)  # [1, 1, res, res]
+                a_map = F.interpolate(
+                    a_map,
+                    size=(args.image_size, args.image_size),
+                    mode="bilinear",
+                    align_corners=True,
+                )
+                map_structure += a_map
+            map_structure = gaussian_filter(
+                map_structure.to("cpu").detach().numpy(), sigma=4
+            )
+            map_structure = torch.tensor(map_structure, dtype=map_logic.dtype)
+            map_structure = map_structure.to(device)
+
+            """
+            # END of replacement
+            """
+
+            map_structure = F.interpolate(
+                map_structure, (orig_height, orig_width), mode="bilinear"
+            )
+            map_structure = (
+                map_structure[0, 0].cpu().numpy()
+            )  # ready to be saved into .tiff format
+
+            defect_class = os.path.basename(os.path.dirname(path))
+
+            if test_output_dir is not None:
+                img_nm = os.path.split(path)[1].split(".")[0]
+                if not os.path.exists(os.path.join(test_output_dir, defect_class)):
+                    os.makedirs(os.path.join(test_output_dir, defect_class))
+                file = os.path.join(test_output_dir, defect_class, img_nm + ".tiff")
+                tifffile.imwrite(file, map_structure)
+
+    exit()
 
     """
     --[EVALUATION]--:
@@ -546,6 +622,7 @@ if __name__ == "__main__":
         help="sub-datasets of Mvtec LOCO",
     )
     parser.add_argument("--stg1_ckpt", type=str)
+    parser.add_argument("--stg2_ckpt", type=str)
     parser.add_argument("--use_validation", action="store_true")
 
     args = parser.parse_args()
