@@ -1,10 +1,15 @@
 #!/bin/bash
 
-#SBATCH --partition=cascade
+###SBATCH --partition=cascade
+
+#SBATCH --partition=feit-gpu-a100
+#SBATCH --qos=feit
 
 #SBATCH --job-name="eval_bb"
 #SBATCH --account=punim1623
 #SBATCH --time=0-01:10:00
+
+
 
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1

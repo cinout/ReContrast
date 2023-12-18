@@ -1,6 +1,9 @@
 #!/bin/bash
 
-#SBATCH --partition=cascade
+###SBATCH --partition=cascade
+
+#SBATCH --partition=feit-gpu-a100
+#SBATCH --qos=feit
 
 #SBATCH --job-name="eval_bb"
 #SBATCH --account=punim1623
