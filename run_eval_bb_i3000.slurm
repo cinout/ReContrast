@@ -1,19 +1,13 @@
 #!/bin/bash
 
-###SBATCH --partition=cascade
-
-#SBATCH --partition=feit-gpu-a100
-#SBATCH --qos=feit
+#SBATCH --partition=cascade
 
 #SBATCH --job-name="eval_bb"
 #SBATCH --account=punim1623
 #SBATCH --time=0-01:10:00
 
-
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --gres=gpu:1
-
 
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=40G
@@ -26,8 +20,8 @@ module purge
 eval "$(conda shell.bash hook)"
 conda activate eff
 
-timestamp="20231219_180436_53_33_[bb]_sd10" 
-folder_name="stg2_debug"
+timestamp="20231219_184338_50_62_[bb]_sd10"
+folder_name="stg2_i3000"
 
 python -u mvtec_loco_ad_evaluation/evaluate_experiment.py \
   --object_name "breakfast_box" \
