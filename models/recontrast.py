@@ -296,12 +296,13 @@ class LogicalMaskProducer(nn.Module):
                     return x
             else:  # eval on each test image
                 with torch.no_grad():
+                    # structural branch
                     stg1_en, stg1_de = self.model_stg1(x)
 
                     # logical branch
                     x = self.model_stg1.encoder(x)
                     x = self.model_stg1.bottleneck(x)  # [bs, 2048, 8, 8]
-                    x = self.bottleneck(x)
+
                     x = x.permute(0, 2, 3, 1)
                     x = self.channel_reducer(x)
                     x = x.permute(0, 3, 1, 2)
@@ -337,8 +338,20 @@ class LogicalMaskProducer(nn.Module):
                         pred_mask,
                     )
 
-    def train(self):
+    def train(self, mode=True):
+        self.training = mode
         self.model_stg1.apply(set_bn_eval)
+        if mode is True:
+            self.model_stg1.train(False)
+            self.channel_reducer.train(True)
+            self.self_att_module.train(True)
+            self.deconv.train(True)
+        else:
+            self.model_stg1.train(False)
+            self.channel_reducer.train(False)
+            self.self_att_module.train(False)
+            self.deconv.train(False)
+        return self
 
 
 class ReContrast(nn.Module):
