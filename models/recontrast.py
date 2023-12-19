@@ -4,6 +4,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+def set_bn_eval(m):
+    classname = m.__class__.__name__
+    if classname.find("BatchNorm2d") != -1:
+        m.eval()
+
+
 class Mlp(nn.Module):
     def __init__(
         self,
@@ -270,79 +276,69 @@ class LogicalMaskProducer(nn.Module):
             """
             if get_ref_features:  # to obtain 10% ref features from train set
                 # extract features with pretrained stg1 model
-                with torch.no_grad:
+                with torch.no_grad():
                     x = self.model_stg1.encoder(x)
                     x = self.model_stg1.bottleneck(x)  # [bs, 2048, 8, 8]
 
-                # reduce channel dimension
-                x = x.permute(0, 2, 3, 1)
-                x = self.channel_reducer(x)
-                x = x.permute(0, 3, 1, 2)
+                    # reduce channel dimension
+                    x = x.permute(0, 2, 3, 1)
+                    x = self.channel_reducer(x)
+                    x = x.permute(0, 3, 1, 2)
 
-                # pass through attention module
-                B, C, H, W = x.shape
-                x = x.reshape(B, C, -1)
-                x = x.permute(0, 2, 1)
-                for blk in self.self_att_module:
-                    x = blk(x, H, W)
-                x = x.permute(0, 1, 2)
-                x = x.reshape(B, C, H, W)  # [10%, 512, 8, 8]
-                return x
+                    # pass through attention module
+                    B, C, H, W = x.shape
+                    x = x.reshape(B, C, -1)
+                    x = x.permute(0, 2, 1)
+                    for blk in self.self_att_module:
+                        x = blk(x, H, W)
+                    x = x.permute(0, 1, 2)
+                    x = x.reshape(B, C, H, W)  # [10%, 512, 8, 8]
+                    return x
             else:  # eval on each test image
-                with torch.no_grad:
-                    en, de = self.model_stg1(x)
-                    return (en, de)
-                # en = self.encoder(x)
+                with torch.no_grad():
+                    stg1_en, stg1_de = self.model_stg1(x)
 
-                # # structural branch
-                # en_freeze = self.encoder_freeze(x)
-                # en_2 = [torch.cat([a, b], dim=0) for a, b in zip(en, en_freeze)]
-                # de = self.decoder(self.bottleneck(en_2))
-                # de = [a.chunk(dim=0, chunks=2) for a in de]
-                # de = [de[0][0], de[1][0], de[2][0], de[3][1], de[4][1], de[5][1]]
+                    # logical branch
+                    x = self.model_stg1.encoder(x)
+                    x = self.model_stg1.bottleneck(x)  # [bs, 2048, 8, 8]
+                    x = self.bottleneck(x)
+                    x = x.permute(0, 2, 3, 1)
+                    x = self.channel_reducer(x)
+                    x = x.permute(0, 3, 1, 2)
 
-                # return (
-                #     en_freeze + en,
-                #     de,
-                # )
+                    B, C, H, W = x.shape
+                    x = x.reshape(B, C, -1)
+                    x = x.permute(0, 2, 1)
+                    for blk in self.self_att_module:
+                        x = blk(x, H, W)
+                    x = x.permute(0, 1, 2)
+                    x = x.reshape(B, C, H, W)  # [1, 512, 8, 8]
 
-                # TODO: uncomment them
-                # # logical branch
-                # y = self.bottleneck(en)
-                # y = y.permute(0, 2, 3, 1)
-                # y = self.channel_reducer(y)
-                # y = y.permute(0, 3, 1, 2)
+                    assert ref_features is not None, "ref_features should not be None"
+                    num_ref = ref_features.shape[0]
+                    max_sim = -1000
+                    max_index = None
 
-                # B, C, H, W = y.shape
-                # y = y.reshape(B, C, -1)
-                # y = y.permute(0, 2, 1)
-                # for blk in self.self_att_module:
-                #     y = blk(y, H, W)
-                # y = y.permute(0, 1, 2)
-                # y = y.reshape(B, C, H, W)  # [1, 512, 8, 8]
+                    for i in range(num_ref):
+                        ref = ref_features[i]
+                        sim = F.cosine_similarity(ref, x[0], dim=0).mean()
+                        if sim > max_sim:
+                            max_sim = sim
+                            max_index = i
+                    intermediate_input = torch.cat(
+                        [ref_features[max_index], x[0]]
+                    ).unsqueeze(0)
+                    pred_mask = self.deconv(intermediate_input)
+                    pred_mask = torch.softmax(pred_mask, dim=1)
 
-                # assert ref_features is not None, "ref_features should not be None"
-                # num_ref = ref_features.shape[0]
-                # max_sim = -1000
-                # max_index = None
+                    return (
+                        stg1_en,
+                        stg1_de,
+                        pred_mask,
+                    )
 
-                # for i in range(num_ref):
-                #     ref = ref_features[i]
-                #     sim = F.cosine_similarity(ref, y[0], dim=0).mean()
-                #     if sim > max_sim:
-                #         max_sim = sim
-                #         max_index = i
-                # intermediate_input = torch.cat(
-                #     [ref_features[max_index], y[0]]
-                # ).unsqueeze(0)
-                # pred_mask = self.deconv(intermediate_input)
-                # pred_mask = torch.softmax(pred_mask, dim=1)
-
-                # return (
-                #     en_freeze + en,
-                #     de,
-                #     pred_mask,
-                # )  # de's first half is recons of en, second half is recons of en_freeze
+    def train(self):
+        self.model_stg1.apply(set_bn_eval)
 
 
 class ReContrast(nn.Module):
