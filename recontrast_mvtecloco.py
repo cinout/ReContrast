@@ -497,9 +497,9 @@ def train(args, seed):
                     )
                 )
 
-        torch.save(
-            model_stg2.state_dict(), os.path.join(train_output_dir, f"model_stg2.pth")
-        )
+        model_stg2_dict = model_stg2.state_dict()
+        torch.save(model_stg2_dict, os.path.join(train_output_dir, f"model_stg2.pth"))
+
     else:
         model_stg2_dict = torch.load(args.stg2_ckpt, map_location=device)
         model_stg2.load_state_dict(model_stg2_dict)
@@ -528,8 +528,9 @@ def train(args, seed):
         )
         if outcome == False:
             keys_with_diff.append(key)
+    print("------keys_with_diff------")
     print(keys_with_diff)
-    exit()
+    print("------[END] keys_with_diff------")
 
     # TODO: debug hack code, remove later
     model_stg2.eval()
