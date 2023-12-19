@@ -24,6 +24,13 @@ from PIL import Image, ImageOps
 from dataset import transform_data, LogicalAnomalyDataset
 from utils import FocalLoss
 
+
+def set_bn_eval(m):
+    classname = m.__class__.__name__
+    if classname.find("BatchNorm2d") != -1:
+        m.eval()
+
+
 timestamp = (
     datetime.now().strftime("%Y%m%d_%H%M%S")
     + "_"
@@ -398,7 +405,7 @@ def train(args, seed):
         model_stg1.load_state_dict(model_stg1_dict)
         model_stg1 = model_stg1.to(device)
         model_stg1.eval()
-
+    model_stg1.apply(set_bn_eval)
     # for k, v in model_stg1_dict.items():
     #     if k.startswith("encoder."):
     #         pretrained_encoder[k.replace("encoder.", "")] = v
@@ -523,7 +530,7 @@ def train(args, seed):
         outcome = torch.all(
             torch.eq(
                 model_stg1_dict[key],
-                model_stg2_dict[key],
+                model_stg2_dict["model_stg1." + key],
             )
         )
         if outcome == False:
