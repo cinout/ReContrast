@@ -178,18 +178,23 @@ class DeConv(nn.Module):
 
 
 class LogicalMaskProducer(nn.Module):
-    def __init__(self, encoder, bottleneck, encoder_freeze, decoder) -> None:
+    def __init__(
+        self,
+        # encoder, bottleneck, encoder_freeze, decoder,
+        model_stg1,
+    ) -> None:
         super().__init__()
         # from stg1
-        self.encoder = encoder
-        self.bottleneck = bottleneck
-        self.encoder_freeze = encoder_freeze
-        self.decoder = decoder
+        self.model_stg1 = model_stg1
+        # self.encoder = encoder
+        # self.bottleneck = bottleneck
+        # self.encoder_freeze = encoder_freeze
+        # self.decoder = decoder
 
-        self.encoder.layer4 = None
-        self.encoder.fc = None
-        self.encoder_freeze.layer4 = None
-        self.encoder_freeze.fc = None
+        # self.encoder.layer4 = None
+        # self.encoder.fc = None
+        # self.encoder_freeze.layer4 = None
+        # self.encoder_freeze.fc = None
 
         # from stg2
         self.channel_reducer = nn.Linear(in_features=2048, out_features=512)
@@ -199,14 +204,8 @@ class LogicalMaskProducer(nn.Module):
         self.deconv = DeConv()
 
         # prevent gradients
-        for component in [
-            self.encoder,
-            self.encoder_freeze,
-            self.bottleneck,
-            self.decoder,
-        ]:
-            for param in component.parameters():
-                param.requires_grad = False
+        for param in self.model_stg1.parameters():
+            param.requires_grad = False
 
     def forward(self, x, get_ref_features=False, ref_features=None):
         # x.shape: [bs, 3, 256, 256]
@@ -216,8 +215,9 @@ class LogicalMaskProducer(nn.Module):
             train mode
             """
             # extract features with pretrained stg1 model
-            x = self.encoder(x)
-            x = self.bottleneck(x)  # [bs, 2048, 8, 8]
+            with torch.no_grad():
+                x = self.model_stg1.encoder(x)
+                x = self.model_stg1.bottleneck(x)  # [bs, 2048, 8, 8]
 
             # reduce channel dimension
             x = x.permute(0, 2, 3, 1)
@@ -270,8 +270,9 @@ class LogicalMaskProducer(nn.Module):
             """
             if get_ref_features:  # to obtain 10% ref features from train set
                 # extract features with pretrained stg1 model
-                x = self.encoder(x)
-                x = self.bottleneck(x)  # [bs, 2048, 8, 8]
+                with torch.no_grad:
+                    x = self.model_stg1.encoder(x)
+                    x = self.model_stg1.bottleneck(x)  # [bs, 2048, 8, 8]
 
                 # reduce channel dimension
                 x = x.permute(0, 2, 3, 1)
@@ -288,19 +289,22 @@ class LogicalMaskProducer(nn.Module):
                 x = x.reshape(B, C, H, W)  # [10%, 512, 8, 8]
                 return x
             else:  # eval on each test image
-                en = self.encoder(x)
+                with torch.no_grad:
+                    en, de = self.model_stg1(x)
+                    return (en, de)
+                # en = self.encoder(x)
 
-                # structural branch
-                en_freeze = self.encoder_freeze(x)
-                en_2 = [torch.cat([a, b], dim=0) for a, b in zip(en, en_freeze)]
-                de = self.decoder(self.bottleneck(en_2))
-                de = [a.chunk(dim=0, chunks=2) for a in de]
-                de = [de[0][0], de[1][0], de[2][0], de[3][1], de[4][1], de[5][1]]
+                # # structural branch
+                # en_freeze = self.encoder_freeze(x)
+                # en_2 = [torch.cat([a, b], dim=0) for a, b in zip(en, en_freeze)]
+                # de = self.decoder(self.bottleneck(en_2))
+                # de = [a.chunk(dim=0, chunks=2) for a in de]
+                # de = [de[0][0], de[1][0], de[2][0], de[3][1], de[4][1], de[5][1]]
 
-                return (
-                    en_freeze + en,
-                    de,
-                )
+                # return (
+                #     en_freeze + en,
+                #     de,
+                # )
 
                 # TODO: uncomment them
                 # # logical branch

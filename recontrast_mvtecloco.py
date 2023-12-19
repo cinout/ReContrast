@@ -243,24 +243,24 @@ def train(args, seed):
         )
     # else:
     #     #for debugging, remove this else condition later
-    #     encoder, bn = wide_resnet50_2(pretrained=False)
-    #     encoder = encoder.to(device)
-    #     bn = bn.to(device)
-    #     encoder_freeze = copy.deepcopy(encoder)
+    # encoder, bn = wide_resnet50_2(pretrained=False)
+    # encoder = encoder.to(device)
+    # bn = bn.to(device)
+    # encoder_freeze = copy.deepcopy(encoder)
 
-    #     decoder = de_wide_resnet50_2(pretrained=False, output_conv=2)
-    #     decoder = decoder.to(device)
+    # decoder = de_wide_resnet50_2(pretrained=False, output_conv=2)
+    # decoder = decoder.to(device)
 
-    #     model_stg1 = ReContrast(
-    #         encoder=encoder,
-    #         encoder_freeze=encoder_freeze,
-    #         bottleneck=bn,
-    #         decoder=decoder,
-    #     )
-    #     model_stg1_dict = torch.load(args.stg1_ckpt, map_location=device)
-    #     model_stg1.load_state_dict(model_stg1_dict)
-    #     model_stg1 = model_stg1.to(device)
-    #     model_stg1.eval()
+    # model_stg1 = ReContrast(
+    #     encoder=encoder,
+    #     encoder_freeze=encoder_freeze,
+    #     bottleneck=bn,
+    #     decoder=decoder,
+    # )
+    # model_stg1_dict = torch.load(args.stg1_ckpt, map_location=device)
+    # model_stg1.load_state_dict(model_stg1_dict)
+    # model_stg1 = model_stg1.to(device)
+    # model_stg1.eval()
     #     with torch.no_grad():
     #         test_path = "datasets/loco/" + args.subdataset + "/test"
     #         test_data = ImageFolderWithPath(test_path)
@@ -360,55 +360,76 @@ def train(args, seed):
     preparing model, including (1) freeze the stg1, (2) attention module, (3) DeConv module
     """
 
-    (
-        encoder,
-        bottleneck,
-    ) = wide_resnet50_2()
-    encoder_freeze = copy.deepcopy(encoder)
-    decoder = de_wide_resnet50_2(output_conv=2)
+    # (
+    #     encoder,
+    #     bottleneck,
+    # ) = wide_resnet50_2()
+    # encoder_freeze = copy.deepcopy(encoder)
+    # decoder = de_wide_resnet50_2(output_conv=2)
 
-    pretrained_encoder = {}
-    pretrained_encoder_freeze = {}
-    pretrained_bottleneck = {}
-    pretrained_decoder = {}
+    # pretrained_encoder = {}
+    # pretrained_encoder_freeze = {}
+    # pretrained_bottleneck = {}
+    # pretrained_decoder = {}
 
     if args.stg1_ckpt is None:
         # load from current model_stg1
-        model_stg1_dict = model_stg1.state_dict()
+        # model_stg1_dict = model_stg1.state_dict()
+        model_stg1.eval()
     else:
         # load from local file
+        # model_stg1_dict = torch.load(args.stg1_ckpt, map_location=device)
+
+        encoder, bn = wide_resnet50_2(pretrained=False)
+        encoder = encoder.to(device)
+        bn = bn.to(device)
+        encoder_freeze = copy.deepcopy(encoder)
+
+        decoder = de_wide_resnet50_2(pretrained=False, output_conv=2)
+        decoder = decoder.to(device)
+
+        model_stg1 = ReContrast(
+            encoder=encoder,
+            encoder_freeze=encoder_freeze,
+            bottleneck=bn,
+            decoder=decoder,
+        )
         model_stg1_dict = torch.load(args.stg1_ckpt, map_location=device)
+        model_stg1.load_state_dict(model_stg1_dict)
+        model_stg1 = model_stg1.to(device)
+        model_stg1.eval()
 
-    for k, v in model_stg1_dict.items():
-        if k.startswith("encoder."):
-            pretrained_encoder[k.replace("encoder.", "")] = v
-        elif k.startswith("encoder_freeze."):
-            pretrained_encoder_freeze[k.replace("encoder_freeze.", "")] = v
-        elif k.startswith("bottleneck."):
-            pretrained_bottleneck[k.replace("bottleneck.", "")] = v
-        elif k.startswith("decoder."):
-            pretrained_decoder[k.replace("decoder.", "")] = v
-        else:
-            raise Exception("Unknown key from model_stg1_dict")
-    encoder.load_state_dict(
-        pretrained_encoder, strict=False
-    )  # because layer4 is not used
-    encoder_freeze.load_state_dict(
-        pretrained_encoder_freeze, strict=False
-    )  # because layer4 is not used
-    bottleneck.load_state_dict(pretrained_bottleneck)
-    decoder.load_state_dict(pretrained_decoder)
+    # for k, v in model_stg1_dict.items():
+    #     if k.startswith("encoder."):
+    #         pretrained_encoder[k.replace("encoder.", "")] = v
+    #     elif k.startswith("encoder_freeze."):
+    #         pretrained_encoder_freeze[k.replace("encoder_freeze.", "")] = v
+    #     elif k.startswith("bottleneck."):
+    #         pretrained_bottleneck[k.replace("bottleneck.", "")] = v
+    #     elif k.startswith("decoder."):
+    #         pretrained_decoder[k.replace("decoder.", "")] = v
+    #     else:
+    #         raise Exception("Unknown key from model_stg1_dict")
+    # encoder.load_state_dict(
+    #     pretrained_encoder, strict=False
+    # )  # because layer4 is not used
+    # encoder_freeze.load_state_dict(
+    #     pretrained_encoder_freeze, strict=False
+    # )  # because layer4 is not used
+    # bottleneck.load_state_dict(pretrained_bottleneck)
+    # decoder.load_state_dict(pretrained_decoder)
 
-    encoder = encoder.to(device)
-    encoder_freeze = encoder_freeze.to(device)
-    bottleneck = bottleneck.to(device)
-    decoder = decoder.to(device)
+    # encoder = encoder.to(device)
+    # encoder_freeze = encoder_freeze.to(device)
+    # bottleneck = bottleneck.to(device)
+    # decoder = decoder.to(device)
 
     model_stg2 = LogicalMaskProducer(
-        encoder=encoder,
-        bottleneck=bottleneck,
-        encoder_freeze=encoder_freeze,
-        decoder=decoder,
+        # encoder=encoder,
+        # bottleneck=bottleneck,
+        # encoder_freeze=encoder_freeze,
+        # decoder=decoder,
+        model_stg1=model_stg1
     )
     model_stg2 = model_stg2.to(device)
 
@@ -482,6 +503,33 @@ def train(args, seed):
     else:
         model_stg2_dict = torch.load(args.stg2_ckpt, map_location=device)
         model_stg2.load_state_dict(model_stg2_dict)
+
+    # TODO: remove
+    # print(model_stg1_dict.keys())
+    # print(model_stg2_dict.keys())
+    """
+    True:
+    encoder.conv1.weight
+    encoder.bn1.weight
+
+    False:
+    encoder.layer1.0.bn1.num_batches_tracked
+    encoder.bn1.running_mean
+    encoder.bn1.running_var
+    """
+
+    keys_with_diff = []
+    for key in model_stg1_dict.keys():
+        outcome = torch.all(
+            torch.eq(
+                model_stg1_dict[key],
+                model_stg2_dict[key],
+            )
+        )
+        if outcome == False:
+            keys_with_diff.append(key)
+    print(keys_with_diff)
+    exit()
 
     # TODO: debug hack code, remove later
     model_stg2.eval()
