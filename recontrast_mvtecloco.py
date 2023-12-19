@@ -468,32 +468,22 @@ def train(args, seed):
             image = image.unsqueeze(0)
             image = image.to(device)  # [bs, 3, 256, 256]
 
-            # TODO: args.use_validation is just for debugging
-            if args.use_validation:
-                map_combined, map_structure, map_logic = predict(
-                    image,
-                    model_stg2,
-                    ref_features,
-                    args,
-                    q_structure_start=q_structure_start,
-                    q_structure_end=q_structure_end,
-                    q_logic_start=q_logic_start,
-                    q_logic_end=q_logic_end,
-                )
-            else:
-                map_combined, map_structure, map_logic = predict(
-                    image,
-                    model_stg2,
-                    ref_features,
-                    args,
-                )
-
-            # TODO: revert to map_combined in the future
-            map_structure = F.interpolate(
-                map_structure, (orig_height, orig_width), mode="bilinear"
+            map_combined, _, _ = predict(
+                image,
+                model_stg2,
+                ref_features,
+                args,
+                q_structure_start=q_structure_start,
+                q_structure_end=q_structure_end,
+                q_logic_start=q_logic_start,
+                q_logic_end=q_logic_end,
             )
-            map_structure = (
-                map_structure[0, 0].cpu().numpy()
+
+            map_combined = F.interpolate(
+                map_combined, (orig_height, orig_width), mode="bilinear"
+            )
+            map_combined = (
+                map_combined[0, 0].cpu().numpy()
             )  # ready to be saved into .tiff format
 
             defect_class = os.path.basename(os.path.dirname(path))
@@ -503,7 +493,7 @@ def train(args, seed):
                 if not os.path.exists(os.path.join(test_output_dir, defect_class)):
                     os.makedirs(os.path.join(test_output_dir, defect_class))
                 file = os.path.join(test_output_dir, defect_class, img_nm + ".tiff")
-                tifffile.imwrite(file, map_structure)
+                tifffile.imwrite(file, map_combined)
 
 
 if __name__ == "__main__":
@@ -538,7 +528,6 @@ if __name__ == "__main__":
     )
     parser.add_argument("--stg1_ckpt", type=str)
     parser.add_argument("--stg2_ckpt", type=str)
-    parser.add_argument("--use_validation", action="store_true")
 
     args = parser.parse_args()
     args.output_dir = args.output_dir + f"_[{subdataset_mapper[args.subdataset]}]"
