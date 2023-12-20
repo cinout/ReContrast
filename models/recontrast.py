@@ -186,10 +186,11 @@ class DeConv(nn.Module):
 class LogicalMaskProducer(nn.Module):
     def __init__(
         self,
-        # encoder, bottleneck, encoder_freeze, decoder,
         model_stg1,
+        logicano_only,
     ) -> None:
         super().__init__()
+        self.logicano_only = logicano_only
         # from stg1
         self.model_stg1 = model_stg1
 
@@ -231,34 +232,50 @@ class LogicalMaskProducer(nn.Module):
             x = x.reshape(B, C, H, W)  # [bs, 512, 8, 8]
 
             # find nearest item from refs to logicano/normal images
-            refs = x[:-2]  # [bs-2, 512, 8, 8]
-            logicano = x[-2]
-            normal = x[-1]
 
-            num_ref = refs.shape[0]
-            max_logicano_sim = -1000
-            max_logicano_index = None
-            max_normal_sim = -1000
-            max_normal_index = None
-            for i in range(num_ref):
-                ref = refs[i]
-                logicano_sim = F.cosine_similarity(ref, logicano, dim=0).mean()
-                if logicano_sim > max_logicano_sim:
-                    max_logicano_sim = logicano_sim
-                    max_logicano_index = i
-                normal_sim = F.cosine_similarity(ref, normal, dim=0).mean()
-                if normal_sim > max_normal_sim:
-                    max_normal_sim = normal_sim
-                    max_normal_index = i
+            if self.self.logicano_only:
+                refs = x[:-1]
+                logicano = x[-1]
+                num_ref = refs.shape[0]
+                max_logicano_sim = -1000
+                max_logicano_index = None
+                for i in range(num_ref):
+                    ref = refs[i]
+                    logicano_sim = F.cosine_similarity(ref, logicano, dim=0).mean()
+                    if logicano_sim > max_logicano_sim:
+                        max_logicano_sim = logicano_sim
+                        max_logicano_index = i
+                logicano_input = torch.cat([refs[max_logicano_index], logicano])
+                intermediate_input = logicano_input.unsqueeze(0)
+            else:
+                refs = x[:-2]  # [bs-2, 512, 8, 8]
+                logicano = x[-2]
+                normal = x[-1]
 
-            # create two new inputs, and upsample them
-            logicano_input = torch.cat([refs[max_logicano_index], logicano])
-            normal_input = torch.cat([refs[max_normal_index], normal])
-            intermediate_input = torch.stack([logicano_input, normal_input], dim=0)
+                num_ref = refs.shape[0]
+                max_logicano_sim = -1000
+                max_logicano_index = None
+                max_normal_sim = -1000
+                max_normal_index = None
+                for i in range(num_ref):
+                    ref = refs[i]
+                    logicano_sim = F.cosine_similarity(ref, logicano, dim=0).mean()
+                    if logicano_sim > max_logicano_sim:
+                        max_logicano_sim = logicano_sim
+                        max_logicano_index = i
+                    normal_sim = F.cosine_similarity(ref, normal, dim=0).mean()
+                    if normal_sim > max_normal_sim:
+                        max_normal_sim = normal_sim
+                        max_normal_index = i
+
+                # create two new inputs, and upsample them
+                logicano_input = torch.cat([refs[max_logicano_index], logicano])
+                normal_input = torch.cat([refs[max_normal_index], normal])
+                intermediate_input = torch.stack([logicano_input, normal_input], dim=0)
 
             output = self.deconv(
                 intermediate_input
-            )  # [2, 2, 256, 256], (1) logical_ano, (2) normal
+            )  # [1or2, 2, 256, 256], (1) logical_ano, (2) normal
             output = torch.softmax(output, dim=1)
             return output
         else:

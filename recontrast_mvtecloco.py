@@ -307,7 +307,9 @@ def train(args, seed):
         model_stg1 = model_stg1.to(device)
         model_stg1.eval()
 
-    model_stg2 = LogicalMaskProducer(model_stg1=model_stg1)
+    model_stg2 = LogicalMaskProducer(
+        model_stg1=model_stg1, logicano_only=args.logicano_only
+    )
     model_stg2 = model_stg2.to(device)
 
     if args.stg2_ckpt is None:
@@ -352,7 +354,10 @@ def train(args, seed):
             logicano_gt = logicano_gt.to(device)
             normal_gt = normal_gt.to(device)
 
-            image_batch = torch.cat([ref_images, logicano_image, normal_image])
+            if args.logicano_only:
+                image_batch = torch.cat([ref_images, logicano_image])
+            else:
+                image_batch = torch.cat([ref_images, logicano_image, normal_image])
 
             predicted_masks = model_stg2(
                 image_batch
@@ -360,7 +365,12 @@ def train(args, seed):
             predicted_masks = F.interpolate(
                 predicted_masks, (orig_height, orig_width), mode="bilinear"
             )
-            gt_masks = torch.cat([logicano_gt, normal_gt], dim=0)  # [2, 1, 256, 256]
+            if args.logicano_only:
+                gt_masks = logicano_gt  # [1, 1, 256, 256]
+            else:
+                gt_masks = torch.cat(
+                    [logicano_gt, normal_gt], dim=0
+                )  # [2, 1, 256, 256]
 
             # TODO: [LATER] add other loss functions?
             loss = loss_focal(predicted_masks, gt_masks)
