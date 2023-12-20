@@ -352,7 +352,8 @@ def train(args, seed):
             logicano_gt = logicano_gt.to(device)
             normal_gt = normal_gt.to(device)
 
-            image_batch = torch.cat([ref_images, normal_image, logicano_image])
+            image_batch = torch.cat([ref_images, logicano_image, normal_image])
+
             predicted_masks = model_stg2(
                 image_batch
             )  # [2, 2, 256, 256], (1) logical_ano, (2) normal, both softmaxed
@@ -528,6 +529,11 @@ if __name__ == "__main__":
     )
     parser.add_argument("--stg1_ckpt", type=str)
     parser.add_argument("--stg2_ckpt", type=str)
+    parser.add_argument(
+        "--logicano_only",
+        action="store_true",
+        help="if true, then only use one logical anomaly during stg2 training",
+    )
 
     args = parser.parse_args()
     args.output_dir = args.output_dir + f"_[{subdataset_mapper[args.subdataset]}]"
