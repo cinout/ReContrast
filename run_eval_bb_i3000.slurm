@@ -20,7 +20,7 @@ module purge
 eval "$(conda shell.bash hook)"
 conda activate eff
 
-timestamp="20231219_184338_50_62_[bb]_sd10"
+timestamp="20231221_100442_77_19_[bb]_sd10"
 folder_name="stg2_i3000"
 
 python -u mvtec_loco_ad_evaluation/evaluate_experiment.py \
