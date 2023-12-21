@@ -233,7 +233,7 @@ class LogicalMaskProducer(nn.Module):
 
             # find nearest item from refs to logicano/normal images
 
-            if self.self.logicano_only:
+            if self.logicano_only:
                 refs = x[:-1]
                 logicano = x[-1]
                 num_ref = refs.shape[0]
