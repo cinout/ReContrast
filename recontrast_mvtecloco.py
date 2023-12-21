@@ -479,7 +479,8 @@ def train(args, seed):
             image = image.unsqueeze(0)
             image = image.to(device)  # [bs, 3, 256, 256]
 
-            map_combined, _, _ = predict(
+            # TODO: change back to map_combined
+            map_combined, map_structure, _ = predict(
                 image,
                 model_stg2,
                 ref_features,
@@ -490,11 +491,11 @@ def train(args, seed):
                 q_logic_end=q_logic_end,
             )
 
-            map_combined = F.interpolate(
-                map_combined, (orig_height, orig_width), mode="bilinear"
+            map_structure = F.interpolate(
+                map_structure, (orig_height, orig_width), mode="bilinear"
             )
-            map_combined = (
-                map_combined[0, 0].cpu().numpy()
+            map_structure = (
+                map_structure[0, 0].cpu().numpy()
             )  # ready to be saved into .tiff format
 
             defect_class = os.path.basename(os.path.dirname(path))
@@ -504,7 +505,7 @@ def train(args, seed):
                 if not os.path.exists(os.path.join(test_output_dir, defect_class)):
                     os.makedirs(os.path.join(test_output_dir, defect_class))
                 file = os.path.join(test_output_dir, defect_class, img_nm + ".tiff")
-                tifffile.imwrite(file, map_combined)
+                tifffile.imwrite(file, map_structure)
 
 
 if __name__ == "__main__":
