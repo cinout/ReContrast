@@ -184,13 +184,12 @@ class DeConv(nn.Module):
 
 
 class LogicalMaskProducer(nn.Module):
-    def __init__(
-        self,
-        model_stg1,
-        logicano_only,
-    ) -> None:
+    def __init__(self, model_stg1, logicano_only=False, loss_mode="extreme") -> None:
         super().__init__()
+        # choices
         self.logicano_only = logicano_only
+        self.loss_mode = loss_mode
+
         # from stg1
         self.model_stg1 = model_stg1
 
@@ -232,50 +231,66 @@ class LogicalMaskProducer(nn.Module):
             x = x.reshape(B, C, H, W)  # [bs, 512, 8, 8]
 
             # find nearest item from refs to logicano/normal images
-
             if self.logicano_only:
-                refs = x[:-1]
+                refs = x[:-1]  # [bs-1, 512, 8, 8]
                 logicano = x[-1]
-                num_ref = refs.shape[0]
-                max_logicano_sim = -1000
-                max_logicano_index = None
-                for i in range(num_ref):
-                    ref = refs[i]
-                    logicano_sim = F.cosine_similarity(ref, logicano, dim=0).mean()
-                    if logicano_sim > max_logicano_sim:
-                        max_logicano_sim = logicano_sim
-                        max_logicano_index = i
-                logicano_input = torch.cat([refs[max_logicano_index], logicano])
-                intermediate_input = logicano_input.unsqueeze(0)
+
+                if self.loss_mode == "extreme":
+                    num_ref = refs.shape[0]
+                    max_logicano_sim = -1000
+                    max_logicano_index = None
+                    for i in range(num_ref):
+                        ref = refs[i]
+                        logicano_sim = F.cosine_similarity(ref, logicano, dim=0).mean()
+                        if logicano_sim > max_logicano_sim:
+                            max_logicano_sim = logicano_sim
+                            max_logicano_index = i
+                    logicano_input = torch.cat([refs[max_logicano_index], logicano])
+                    intermediate_input = logicano_input.unsqueeze(0)
+                elif self.loss_mode == "average":
+                    refs = torch.mean(refs, dim=0)
+                    logicano_input = torch.cat([refs, logicano])
+                    intermediate_input = logicano_input.unsqueeze(0)
             else:
                 refs = x[:-2]  # [bs-2, 512, 8, 8]
                 logicano = x[-2]
                 normal = x[-1]
 
-                num_ref = refs.shape[0]
-                max_logicano_sim = -1000
-                max_logicano_index = None
-                max_normal_sim = -1000
-                max_normal_index = None
-                for i in range(num_ref):
-                    ref = refs[i]
-                    logicano_sim = F.cosine_similarity(ref, logicano, dim=0).mean()
-                    if logicano_sim > max_logicano_sim:
-                        max_logicano_sim = logicano_sim
-                        max_logicano_index = i
-                    normal_sim = F.cosine_similarity(ref, normal, dim=0).mean()
-                    if normal_sim > max_normal_sim:
-                        max_normal_sim = normal_sim
-                        max_normal_index = i
+                if self.loss_mode == "extreme":
+                    num_ref = refs.shape[0]
+                    max_logicano_sim = -1000
+                    max_logicano_index = None
+                    max_normal_sim = -1000
+                    max_normal_index = None
+                    for i in range(num_ref):
+                        ref = refs[i]
+                        logicano_sim = F.cosine_similarity(ref, logicano, dim=0).mean()
+                        if logicano_sim > max_logicano_sim:
+                            max_logicano_sim = logicano_sim
+                            max_logicano_index = i
+                        normal_sim = F.cosine_similarity(ref, normal, dim=0).mean()
+                        if normal_sim > max_normal_sim:
+                            max_normal_sim = normal_sim
+                            max_normal_index = i
 
-                # create two new inputs, and upsample them
-                logicano_input = torch.cat([refs[max_logicano_index], logicano])
-                normal_input = torch.cat([refs[max_normal_index], normal])
-                intermediate_input = torch.stack([logicano_input, normal_input], dim=0)
+                    # create two new inputs, and upsample them
+                    logicano_input = torch.cat([refs[max_logicano_index], logicano])
+                    normal_input = torch.cat([refs[max_normal_index], normal])
+                    intermediate_input = torch.stack(
+                        [logicano_input, normal_input], dim=0
+                    )
+                elif self.loss_mode == "average":
+                    refs = torch.mean(refs, dim=0)
+                    logicano_input = torch.cat([refs, logicano])
+                    normal_input = torch.cat([refs, normal])
+                    intermediate_input = torch.stack(
+                        [logicano_input, normal_input], dim=0
+                    )
 
             output = self.deconv(
                 intermediate_input
             )  # [1or2, 2, 256, 256], (1) logical_ano, (2) normal
+
             output = torch.softmax(output, dim=1)
             return output
         else:
@@ -324,22 +339,28 @@ class LogicalMaskProducer(nn.Module):
                     x = x.reshape(B, C, H, W)  # [1, 512, 8, 8]
 
                     assert ref_features is not None, "ref_features should not be None"
-                    num_ref = ref_features.shape[0]
-                    max_sim = -1000
-                    max_index = None
+                    if self.loss_mode == "extreme":
+                        num_ref = ref_features.shape[0]
+                        max_sim = -1000
+                        max_index = None
 
-                    for i in range(num_ref):
-                        ref = ref_features[i]
-                        sim = F.cosine_similarity(ref, x[0], dim=0).mean()
-                        if sim > max_sim:
-                            max_sim = sim
-                            max_index = i
-                    intermediate_input = torch.cat(
-                        [ref_features[max_index], x[0]]
-                    ).unsqueeze(0)
+                        for i in range(num_ref):
+                            ref = ref_features[i]
+                            sim = F.cosine_similarity(ref, x[0], dim=0).mean()
+                            if sim > max_sim:
+                                max_sim = sim
+                                max_index = i
+                        intermediate_input = torch.cat(
+                            [ref_features[max_index], x[0]]
+                        ).unsqueeze(0)
+
+                    elif self.loss_mode == "average":
+                        ref_features = torch.mean(ref_features, dim=0)
+                        intermediate_input = torch.cat([ref_features, x[0]]).unsqueeze(
+                            0
+                        )
                     pred_mask = self.deconv(intermediate_input)
                     pred_mask = torch.softmax(pred_mask, dim=1)
-
                     return (
                         stg1_en,
                         stg1_de,

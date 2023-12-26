@@ -34,6 +34,7 @@ python -u recontrast_mvtecloco.py \
   --seeds 10 \
   --iters_stg2 6000 \
   --stg1_ckpt outputs/stg1_only/outputs_20231212_234313_77_49_[bb]_sd10/trainings/mvtec_loco/breakfast_box/model_stg1.pth \
+  --loss_mode average \
 
 my-job-stats -a -n -s
 ##

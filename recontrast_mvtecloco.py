@@ -308,7 +308,9 @@ def train(args, seed):
         model_stg1.eval()
 
     model_stg2 = LogicalMaskProducer(
-        model_stg1=model_stg1, logicano_only=args.logicano_only
+        model_stg1=model_stg1,
+        logicano_only=args.logicano_only,
+        loss_mode=args.loss_mode,
     )
     model_stg2 = model_stg2.to(device)
 
@@ -361,7 +363,7 @@ def train(args, seed):
 
             predicted_masks = model_stg2(
                 image_batch
-            )  # [2, 2, 256, 256], (1) logical_ano, (2) normal, both softmaxed
+            )  # [2, 2, 256, 256], bs(1) logical_ano, bs(2) normal, both softmaxed
             predicted_masks = F.interpolate(
                 predicted_masks, (orig_height, orig_width), mode="bilinear"
             )
@@ -543,6 +545,12 @@ if __name__ == "__main__":
         "--logicano_only",
         action="store_true",
         help="if true, then only use one logical anomaly during stg2 training",
+    )
+    parser.add_argument(
+        "--loss_mode",
+        default="extreme",
+        choices=["extreme", "average"],
+        help="decides whether to use min or mean with ref to calculate loss",
     )
 
     args = parser.parse_args()
