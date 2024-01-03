@@ -26,7 +26,7 @@ def transform_data(size):
     return data_transforms
 
 
-def transform_gt():
+def transform_gt_into_tensor():
     gt_transforms = transforms.Compose(
         [
             # transforms.Resize((size, size)),
@@ -102,30 +102,37 @@ class LogicalAnomalyDataset(Dataset):
         return transform_data(self.image_size)(img)
 
     def transform_gt(self, paths):
-        final_gt = None
+        overall_gt = None  # purpose is to determine all negative (normal) pixels
+        individual_gts = []
         for each_path in paths:
             gt = Image.open(each_path)
-            gt = ImageOps.grayscale(gt)
-            gt = transform_gt()(gt)
-            if final_gt is not None:
-                final_gt = torch.logical_or(final_gt, gt)
+            gt = np.array(gt)
+            gt = torch.tensor(gt)
+            if overall_gt is not None:
+                overall_gt = torch.logical_or(overall_gt, gt)
             else:
-                final_gt = gt
+                overall_gt = gt
 
-        final_gt = final_gt.bool().to(
-            torch.float32
-        )  # turn into .bool() first because the read white region value is 0.9922 instead of 1
+            individual_gts.append(gt)
 
-        return final_gt
+        overall_gt = overall_gt.bool().to(torch.float32)
+        return overall_gt, individual_gts
 
     def __getitem__(self, index):
         img_path = self.images[index]
         image = self.transform_image(img_path)
 
-        gt_path = self.gt[index]
-        gt = self.transform_gt(gt_path)  # shape: (1, raw_height, raw_width)
+        gt_paths = self.gt[index]
+        overall_gt, individual_gts = self.transform_gt(
+            gt_paths
+        )  # shape: (1, raw_height, raw_width)
 
-        sample = {"image": image, "gt": gt}
+        # TODO: updated
+        sample = {
+            "image": image,
+            "overall_gt": overall_gt,
+            "individual_gts": individual_gts,
+        }
         return sample
 
 

@@ -344,16 +344,19 @@ def train(args, seed):
             ref_images, label1 = refs
             normal_image, label2 = normal
             logicano_image = logicano["image"]
-            logicano_gt = logicano["gt"]
-            _, _, orig_height, orig_width = logicano_gt.shape
+            overall_gt = logicano["overall_gt"]
+            individual_gts = logicano["individual_gts"]
+            # TODO: replace all logicano_gt with new
+            _, _, orig_height, orig_width = overall_gt.shape
             normal_gt = torch.zeros(
-                size=(1, 1, orig_height, orig_width), dtype=logicano_gt.dtype
+                size=(1, 1, orig_height, orig_width), dtype=overall_gt.dtype
             )
 
             ref_images = ref_images.to(device)
             normal_image = normal_image.to(device)
             logicano_image = logicano_image.to(device)
-            logicano_gt = logicano_gt.to(device)
+            overall_gt = overall_gt.to(device)
+            individual_gts = [item.to(device) for item in individual_gts]
             normal_gt = normal_gt.to(device)
 
             if args.logicano_only:
@@ -367,6 +370,8 @@ def train(args, seed):
             predicted_masks = F.interpolate(
                 predicted_masks, (orig_height, orig_width), mode="bilinear"
             )
+
+            # TODO: need to redesign the loss functions here with overall_gt and individual_gts
             if args.logicano_only:
                 gt_masks = logicano_gt  # [1, 1, 256, 256]
             else:

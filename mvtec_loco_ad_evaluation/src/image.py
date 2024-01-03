@@ -12,24 +12,26 @@ from PIL import Image
 
 def get_file_path_repr(file_path: Optional[str]) -> str:
     if file_path is None:
-        return 'no file path'
+        return "no file path"
     else:
         parent_dir_path, file_name = os.path.split(file_path)
         _, parent_dir = os.path.split(parent_dir_path)
-        return f'.../{parent_dir}/{file_name}'
+        return f".../{parent_dir}/{file_name}"
 
 
 class DefectConfig:
-    def __init__(self,
-                 defect_name: str,
-                 pixel_value: int,
-                 saturation_threshold: Union[int, float],
-                 relative_saturation: bool):
+    def __init__(
+        self,
+        defect_name: str,
+        pixel_value: int,
+        saturation_threshold: Union[int, float],
+        relative_saturation: bool,
+    ):
         # Input validation.
         assert 1 <= pixel_value <= 255
         if relative_saturation:
             assert isinstance(saturation_threshold, float)
-            assert 0. < saturation_threshold <= 1.
+            assert 0.0 < saturation_threshold <= 1.0
         else:
             assert isinstance(saturation_threshold, int)
 
@@ -39,12 +41,13 @@ class DefectConfig:
         self.relative_saturation = relative_saturation
 
     def __repr__(self):
-        return f'DefectConfig({self.__dict__})'
+        return f"DefectConfig({self.__dict__})"
 
 
 class DefectsConfig:
     def __init__(self, entries: Sequence[DefectConfig]):
         # Create a pixel_value -> entry mapping for faster lookup.
+        # TODO: this is an important dictionary
         self.pixel_value_to_entry = {e.pixel_value: e for e in entries}
 
     @property
@@ -56,10 +59,11 @@ class DefectsConfig:
         entries = []
         for defect_config in defects_list:
             entry = DefectConfig(
-                defect_name=defect_config['defect_name'],
-                pixel_value=defect_config['pixel_value'],
-                saturation_threshold=defect_config['saturation_threshold'],
-                relative_saturation=defect_config['relative_saturation'])
+                defect_name=defect_config["defect_name"],
+                pixel_value=defect_config["pixel_value"],
+                saturation_threshold=defect_config["saturation_threshold"],
+                relative_saturation=defect_config["relative_saturation"],
+            )
             entries.append(entry)
         return DefectsConfig(entries=entries)
 
@@ -71,9 +75,7 @@ class GroundTruthChannel:
     to represent a defect-free image.
     """
 
-    def __init__(self,
-                 bool_array: np.ndarray,
-                 defect_config: DefectConfig):
+    def __init__(self, bool_array: np.ndarray, defect_config: DefectConfig):
         """
         Args:
             bool_array: A 2-D numpy array with dtype np.bool_. A True value
@@ -96,15 +98,16 @@ class GroundTruthChannel:
     def get_saturation_area(self):
         defect_area = self.get_defect_area()
         if self.defect_config.relative_saturation:
+            # TODO: saturation_threshold is either 1.0 or 0.5
             return int(self.defect_config.saturation_threshold * defect_area)
         else:
-            return np.minimum(self.defect_config.saturation_threshold,
-                              defect_area)
+            # number of pixels that needs to be detected
+            return np.minimum(self.defect_config.saturation_threshold, defect_area)
 
     @classmethod
-    def create_from_integer_array(cls,
-                                  np_array: np.ndarray,
-                                  defects_config: DefectsConfig):
+    def create_from_integer_array(
+        cls, np_array: np.ndarray, defects_config: DefectsConfig
+    ):
         """Create a new GroundTruthChannel from an integer array.
 
         Args:
@@ -117,23 +120,23 @@ class GroundTruthChannel:
         assert np.issubdtype(np_array.dtype, np.integer)
 
         # Ensure that each channel has exactly one unique positive integer.
-        sorted_unique = sorted(np.unique(np_array))
+        sorted_unique = sorted(np.unique(np_array))  # e.g., [0, 235]
         if len(sorted_unique) == 1:
+            # probably never arrived here
             defect_id = sorted_unique[0]
         else:
             zero, defect_id = sorted_unique
             assert zero == 0
         assert defect_id > 0
         # Cast np.uint8 etc. to int.
-        defect_id = int(defect_id)
+        defect_id = int(defect_id)  # defect_id is linked to pixel_value
 
         # Convert to bool for faster logical operations with anomaly maps.
         bool_array = np_array.astype(np.bool_)
 
         # Look up the defect config for this defect id.
         defect_config = defects_config.pixel_value_to_entry[defect_id]
-        return GroundTruthChannel(bool_array=bool_array,
-                                  defect_config=defect_config)
+        return GroundTruthChannel(bool_array=bool_array, defect_config=defect_config)
 
 
 class GroundTruthMap:
@@ -148,10 +151,9 @@ class GroundTruthMap:
     the channels, using defect_id -> str(defect_id).
     """
 
-    def __init__(self,
-                 channels: Sequence[GroundTruthChannel],
-                 file_path: Optional[str] = None):
-
+    def __init__(
+        self, channels: Sequence[GroundTruthChannel], file_path: Optional[str] = None
+    ):
         # Input validation.
         assert len(channels) > 0
         # Ensure that each channel has the same size.
@@ -165,11 +167,13 @@ class GroundTruthMap:
             threshold = channel.defect_config.saturation_threshold
             defect_area = channel.get_defect_area()
             if threshold > defect_area:
-                print(f'WARNING: Channel {i_channel + 1} (1=first) of ground'
-                      f' truth image {get_file_path_repr(file_path)} has a'
-                      f' defect area of {defect_area}, but a saturation'
-                      f' threshold of {threshold}. Corresponding defect'
-                      f' config: {channel.defect_config}')
+                print(
+                    f"WARNING: Channel {i_channel + 1} (1=first) of ground"
+                    f" truth image {get_file_path_repr(file_path)} has a"
+                    f" defect area of {defect_area}, but a saturation"
+                    f" threshold of {threshold}. Corresponding defect"
+                    f" config: {channel.defect_config}"
+                )
 
         self.channels = tuple(channels)
         self.file_path = file_path
@@ -187,19 +191,17 @@ class GroundTruthMap:
         return np.sum(channels_np, axis=0).astype(bool)
 
     @classmethod
-    def read_from_png_dir(cls,
-                          png_dir: str,
-                          defects_config: DefectsConfig):
+    def read_from_png_dir(cls, png_dir: str, defects_config: DefectsConfig):
         """Read a GroundTruthMap from a directory containing one .png per
         channel.
         """
         gt_channels = []
-        for png_path in sorted(glob.glob(os.path.join(png_dir, '*.png'))):
+        for png_path in sorted(glob.glob(os.path.join(png_dir, "*.png"))):
             image = Image.open(png_path)
             np_array = np.array(image)
             gt_channel = GroundTruthChannel.create_from_integer_array(
-                np_array=np_array,
-                defects_config=defects_config)
+                np_array=np_array, defects_config=defects_config
+            )
             gt_channels.append(gt_channel)
 
         return cls(channels=gt_channels, file_path=png_dir)
@@ -212,9 +214,7 @@ class AnomalyMap:
     .tiff file.
     """
 
-    def __init__(self,
-                 np_array: np.ndarray,
-                 file_path: Optional[str] = None):
+    def __init__(self, np_array: np.ndarray, file_path: Optional[str] = None):
         """
         Args:
             np_array: A 2-D numpy array containing the real-valued anomaly
@@ -228,7 +228,7 @@ class AnomalyMap:
         self.file_path = file_path
 
     def __repr__(self):
-        return f'AnomalyMap({get_file_path_repr(self.file_path)})'
+        return f"AnomalyMap({get_file_path_repr(self.file_path)})"
 
     @property
     def size(self):
@@ -239,8 +239,7 @@ class AnomalyMap:
 
         The result is a 2-D numpy array with dtype np.bool_.
         """
-        return self.get_binary_images(
-            anomaly_thresholds=[anomaly_threshold])[0]
+        return self.get_binary_images(anomaly_thresholds=[anomaly_threshold])[0]
 
     def get_binary_images(self, anomaly_thresholds: Iterable[float]):
         """Return binary anomaly maps based on given thresholds.
@@ -248,8 +247,7 @@ class AnomalyMap:
         The result is a 3-D numpy array with dtype np.bool_. The first
         dimension has the same length as the anomaly_thresholds.
         """
-        return self._get_binary_images(
-            anomaly_thresholds=tuple(anomaly_thresholds))
+        return self._get_binary_images(anomaly_thresholds=tuple(anomaly_thresholds))
 
     @lru_cache(maxsize=3)
     def _get_binary_images(self, anomaly_thresholds: Tuple[float, ...]):
@@ -261,5 +259,4 @@ class AnomalyMap:
         """Read an AnomalyMap from a TIFF-file."""
         np_array = tifffile.imread(tiff_path)
         assert len(np_array.shape) == 2
-        return cls(np_array=np_array,
-                   file_path=tiff_path)
+        return cls(np_array=np_array, file_path=tiff_path)
