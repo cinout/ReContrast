@@ -83,15 +83,9 @@ class IndividualGTLoss(torch.nn.Module):
             logpt = pt.log()
             loss = -1 * torch.pow((1 - pt), self.gamma) * logpt
 
-            print(loss)
-            print(loss.shape)
-            print("-----------")
             saturated_loss_values, _ = torch.topk(
                 loss, k=saturation_area, largest=False
             )
-            print(saturated_loss_values)
-            print(saturated_loss_values.shape)
-            print("=========**********=========**********")
 
             loss_per_gt.append(saturated_loss_values)
 
