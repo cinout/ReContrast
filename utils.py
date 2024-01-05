@@ -36,6 +36,7 @@ class IndividualGTLoss(torch.nn.Module):
         self.size_average = True
 
     def forward(self, predicted, gts):
+        # predicted.shape: (2, orig.h, orig.w)
         loss_per_gt = []
         for gt in gts:
             # gt.shape: [1, 1, orig.h, orig.w]
@@ -56,32 +57,43 @@ class IndividualGTLoss(torch.nn.Module):
             )
 
             # apply modified focal_loss
+
             num_class = predicted.shape[0]
-            predicted = predicted.view(predicted.shape[0], -1)
-            predicted = predicted.transpose(0, 1)  # shape: (H*W, 2)
+            predicted = predicted.view(predicted.shape[0], -1)  # shape: (2, H*W)
+            predicted = predicted[1]  # shape: (H*W, )
 
             gt = gt.bool().to(torch.float32)
             gt = gt.squeeze(0)
             gt = gt.view(gt.shape[0], -1)
             gt = gt.transpose(0, 1)
 
-            idx = gt.cpu().long()
-            one_hot_key = torch.FloatTensor(gt.size(0), num_class).zero_()
-            one_hot_key = one_hot_key.scatter_(1, idx, 1)
-            if one_hot_key.device != predicted.device:
-                one_hot_key = one_hot_key.to(predicted.device)
-            if self.smooth:
-                one_hot_key = torch.clamp(
-                    one_hot_key, self.smooth / (num_class - 1), 1.0 - self.smooth
-                )
-            pt = (one_hot_key * predicted).sum(1) + self.smooth
-
-            # use mask to only calculate loss of positive pixels
             mask = (gt == 1).squeeze(1)
-            pt = torch.masked_select(pt, mask)
+            predicted = torch.masked_select(predicted, mask)
+            predicted = (
+                (1.0 - self.smooth) * predicted
+                + self.smooth * (1 - predicted)
+                + self.smooth
+            )
+            logpt = predicted.log()
+            loss = -1 * torch.pow((1 - predicted), self.gamma) * logpt
 
-            logpt = pt.log()
-            loss = -1 * torch.pow((1 - pt), self.gamma) * logpt
+            # idx = gt.cpu().long()
+            # one_hot_key = torch.FloatTensor(gt.size(0), num_class).zero_()
+            # print(one_hot_key.shape)
+            # one_hot_key = one_hot_key.scatter_(1, idx, 1)
+            # if one_hot_key.device != predicted.device:
+            #     one_hot_key = one_hot_key.to(predicted.device)
+            # if self.smooth:
+            #     one_hot_key = torch.clamp(
+            #         one_hot_key, self.smooth / (num_class - 1), 1.0 - self.smooth
+            #     )
+            # pt = (one_hot_key * predicted).sum(1) + self.smooth
+
+            # # use mask to only calculate loss of positive pixels
+            # mask = (gt == 1).squeeze(1)
+            # pt = torch.masked_select(pt, mask)
+            # logpt = pt.log()
+            # loss = -1 * torch.pow((1 - pt), self.gamma) * logpt
 
             saturated_loss_values, _ = torch.topk(
                 loss, k=saturation_area, largest=False
