@@ -230,12 +230,10 @@ class LogicalMaskProducer(nn.Module):
             x = x.permute(0, 1, 2)
             x = x.reshape(B, C, H, W)  # [bs, 512, 8, 8]
 
-            # find nearest item from refs to logicano/normal images
-            if self.logicano_only:
-                refs = x[:-1]  # [bs-1, 512, 8, 8]
-                logicano = x[-1]
-
-                if self.loss_mode == "extreme":
+            if self.loss_mode == "extreme":
+                if self.logicano_only:
+                    refs = x[:-1]  # [bs-1, 512, 8, 8]
+                    logicano = x[-1]
                     num_ref = refs.shape[0]
                     max_logicano_sim = -1000
                     max_logicano_index = None
@@ -247,16 +245,7 @@ class LogicalMaskProducer(nn.Module):
                             max_logicano_index = i
                     logicano_input = torch.cat([refs[max_logicano_index], logicano])
                     intermediate_input = logicano_input.unsqueeze(0)
-                elif self.loss_mode == "average":
-                    refs = torch.mean(refs, dim=0)
-                    logicano_input = torch.cat([refs, logicano])
-                    intermediate_input = logicano_input.unsqueeze(0)
-            else:
-                refs = x[:-2]  # [bs-2, 512, 8, 8]
-                logicano = x[-2]
-                normal = x[-1]
-
-                if self.loss_mode == "extreme":
+                else:
                     num_ref = refs.shape[0]
                     max_logicano_sim = -1000
                     max_logicano_index = None
@@ -279,20 +268,49 @@ class LogicalMaskProducer(nn.Module):
                     intermediate_input = torch.stack(
                         [logicano_input, normal_input], dim=0
                     )
-                elif self.loss_mode == "average":
-                    refs = torch.mean(refs, dim=0)
-                    logicano_input = torch.cat([refs, logicano])
-                    normal_input = torch.cat([refs, normal])
+                output = self.deconv(
+                    intermediate_input
+                )  # [1or2, 2, 256, 256], (1) logical_ano, (2) normal
+
+                output = torch.softmax(output, dim=1)
+                return output
+            elif self.loss_mode == "average":
+                if self.logicano_only:
+                    refs = x[:-1]  # [bs-1, 512, 8, 8]
+                    logicano = x[-1]
+                    logicano_input = [torch.cat([ref, logicano]) for ref in refs]
                     intermediate_input = torch.stack(
+                        logicano_input, dim=0
+                    )  # shape: [8, 1024, 8, 8]
+                    output = self.deconv(intermediate_input)
+                    output = output.mean(dim=0)
+                    output = output.unsqueeze(0)
+                    return output
+                else:
+                    refs = x[:-2]  # [bs-2, 512, 8, 8]
+                    logicano = x[-2]
+                    normal = x[-1]
+                    num_ref = refs.shape[0]
+
+                    logicano_input = [torch.cat([ref, logicano]) for ref in refs]
+                    logicano_input = torch.stack(
+                        logicano_input, dim=0
+                    )  # shape: [8, 1024, 8, 8]
+                    normal_input = [torch.cat([ref, normal]) for ref in refs]
+                    normal_input = torch.stack(
+                        normal_input, dim=0
+                    )  # shape: [8, 1024, 8, 8]
+                    intermediate_input = torch.cat(
                         [logicano_input, normal_input], dim=0
-                    )
-
-            output = self.deconv(
-                intermediate_input
-            )  # [1or2, 2, 256, 256], (1) logical_ano, (2) normal
-
-            output = torch.softmax(output, dim=1)
-            return output
+                    )  # shape: [16, 1024, 8, 8]
+                    output = self.deconv(intermediate_input)
+                    output_logicano = output[:num_ref]
+                    output_logicano = output_logicano.mean(dim=0)  # (2, 256, 256)
+                    output_normal = output[num_ref:]
+                    output_normal = output_normal.mean(dim=0)  # (2, 256, 256)
+                    output = torch.stack([output_logicano, output_normal], dim=0)
+                    output = torch.softmax(output, dim=1)
+                    return output
         else:
             """
             eval mode
@@ -353,19 +371,30 @@ class LogicalMaskProducer(nn.Module):
                         intermediate_input = torch.cat(
                             [ref_features[max_index], x[0]]
                         ).unsqueeze(0)
+                        pred_mask = self.deconv(intermediate_input)
+                        pred_mask = torch.softmax(pred_mask, dim=1)
+                        return (
+                            stg1_en,
+                            stg1_de,
+                            pred_mask,
+                        )
 
                     elif self.loss_mode == "average":
-                        ref_features = torch.mean(ref_features, dim=0)
-                        intermediate_input = torch.cat([ref_features, x[0]]).unsqueeze(
-                            0
+                        intermediate_input = [
+                            torch.cat([ref, x[0]]) for ref in ref_features
+                        ]
+                        intermediate_input = torch.stack(
+                            intermediate_input, dim=0
+                        )  # shape: [10%, 1024, 8, 8]
+                        pred_mask = self.deconv(intermediate_input)
+                        pred_mask = pred_mask.mean(dim=0)
+                        pred_mask = pred_mask.unsqueeze(0)
+                        pred_mask = torch.softmax(pred_mask, dim=1)
+                        return (
+                            stg1_en,
+                            stg1_de,
+                            pred_mask,
                         )
-                    pred_mask = self.deconv(intermediate_input)
-                    pred_mask = torch.softmax(pred_mask, dim=1)
-                    return (
-                        stg1_en,
-                        stg1_de,
-                        pred_mask,
-                    )
 
     def train(self, mode=True):
         self.training = mode

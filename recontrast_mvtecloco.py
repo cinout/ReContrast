@@ -22,7 +22,7 @@ from torch.utils.data import Dataset
 import glob
 from PIL import Image, ImageOps
 from dataset import transform_data, LogicalAnomalyDataset
-from utils import FocalLoss
+from utils import FocalLoss, IndividualGTLoss
 
 
 timestamp = (
@@ -335,6 +335,7 @@ def train(args, seed):
         tqdm_obj = tqdm(range(args.iters_stg2))
         model_stg2.train()
         loss_focal = FocalLoss()
+        loss_individual_gt = IndividualGTLoss(args)
         for iter, refs, logicano, normal in zip(
             tqdm_obj,
             train_ref_dataloader_infinite,
@@ -344,20 +345,16 @@ def train(args, seed):
             ref_images, label1 = refs
             normal_image, label2 = normal
             logicano_image = logicano["image"]
-            overall_gt = logicano["overall_gt"]
+            overall_gt = logicano["overall_gt"]  # [1, 1, orig.h, orig.w]
+
             individual_gts = logicano["individual_gts"]
-            # TODO: replace all logicano_gt with new
             _, _, orig_height, orig_width = overall_gt.shape
-            normal_gt = torch.zeros(
-                size=(1, 1, orig_height, orig_width), dtype=overall_gt.dtype
-            )
 
             ref_images = ref_images.to(device)
             normal_image = normal_image.to(device)
             logicano_image = logicano_image.to(device)
             overall_gt = overall_gt.to(device)
             individual_gts = [item.to(device) for item in individual_gts]
-            normal_gt = normal_gt.to(device)
 
             if args.logicano_only:
                 image_batch = torch.cat([ref_images, logicano_image])
@@ -371,16 +368,23 @@ def train(args, seed):
                 predicted_masks, (orig_height, orig_width), mode="bilinear"
             )
 
-            # TODO: need to redesign the loss functions here with overall_gt and individual_gts
-            if args.logicano_only:
-                gt_masks = logicano_gt  # [1, 1, 256, 256]
-            else:
-                gt_masks = torch.cat(
-                    [logicano_gt, normal_gt], dim=0
-                )  # [2, 1, 256, 256]
+            if not args.logicano_only:
+                normal_gt = torch.zeros(
+                    size=(1, 1, orig_height, orig_width), dtype=overall_gt.dtype
+                )
+                normal_gt = normal_gt.to(device)
+                overall_gt = torch.cat(
+                    [overall_gt, normal_gt], dim=0
+                )  # [2, 1, orig.h, orig.w]
 
-            # TODO: [LATER] add other loss functions?
-            loss = loss_focal(predicted_masks, gt_masks)
+            # loss_focal for overall negative target pixels only
+            loss_overall_negative = loss_focal(predicted_masks, overall_gt)
+            # loss for positive pixels in individual gts
+            loss_individual_positive = loss_individual_gt(
+                predicted_masks[0], individual_gts
+            )
+            loss = loss_overall_negative + loss_individual_positive
+
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()

@@ -1,3 +1,4 @@
+import json
 import torch
 import numpy as np
 from torch.nn import functional as F
@@ -19,6 +20,85 @@ import os
 from functools import partial
 import math
 from tqdm import tqdm
+
+
+class IndividualGTLoss(torch.nn.Module):
+    def __init__(self, args) -> None:
+        super().__init__()
+        defects_config_path = os.path.join(
+            "datasets/loco/", args.subdataset, "defects_config.json"
+        )
+        defects = json.load(open(defects_config_path))
+        self.config = {e["pixel_value"]: e for e in defects}
+
+        self.gamma = 2
+        self.smooth = 1e-5
+        self.size_average = True
+
+    def forward(self, predicted, gts):
+        loss_per_gt = []
+        for gt in gts:
+            # gt.shape: [1, 1, orig.h, orig.w]
+            # find unique config for the gt
+            unique_values = sorted(torch.unique(gt).detach().numpy())
+            pixel_type = unique_values[-1]
+            pixel_detail = self.config[pixel_type]
+            saturation_threshold = pixel_detail["saturation_threshold"]
+            relative_saturation = pixel_detail["relative_saturation"]
+
+            # calculate saturation_area (max pixels needed)
+            bool_array = gt.numpy().astype(np.bool_)
+            defect_area = np.sum(bool_array)
+            saturation_area = (
+                int(saturation_threshold * defect_area)
+                if relative_saturation
+                else np.minimum(saturation_threshold, defect_area)
+            )
+
+            # apply modified focal_loss
+            num_class = predicted.shape[0]
+            predicted = predicted.view(predicted.shape[0], -1)
+            predicted = predicted.transpose(0, 1)  # shape: (H*W, 2)
+
+            gt = gt.bool().to(torch.float32)
+            gt = gt.squeeze(0)
+            gt = gt.view(gt.shape[0], -1)
+            gt = gt.transpose(0, 1)
+
+            idx = gt.cpu().long()
+            one_hot_key = torch.FloatTensor(gt.size(0), num_class).zero_()
+            one_hot_key = one_hot_key.scatter_(1, idx, 1)
+            if one_hot_key.device != predicted.device:
+                one_hot_key = one_hot_key.to(predicted.device)
+            if self.smooth:
+                one_hot_key = torch.clamp(
+                    one_hot_key, self.smooth / (num_class - 1), 1.0 - self.smooth
+                )
+            pt = (one_hot_key * predicted).sum(1) + self.smooth
+
+            # use mask to only calculate loss of positive pixels
+            mask = (gt == 1).squeeze(1)
+            pt = torch.masked_select(pt, mask)
+
+            logpt = pt.log()
+            loss = -1 * torch.pow((1 - pt), self.gamma) * logpt
+
+            print(loss)
+            print(loss.shape)
+            print("-----------")
+            saturated_loss_values, _ = torch.topk(
+                loss, k=saturation_area, largest=False
+            )
+            print(saturated_loss_values)
+            print(saturated_loss_values.shape)
+            print("=========**********=========**********")
+
+            loss_per_gt.append(saturated_loss_values)
+
+        loss_per_gt = torch.cat(loss_per_gt, dim=0)
+        if self.size_average:
+            loss_per_gt = loss_per_gt.mean()
+        return loss_per_gt
 
 
 class FocalLoss(torch.nn.Module):
@@ -65,6 +145,11 @@ class FocalLoss(torch.nn.Module):
             )  # with values changed from {0, 1} to {smooth, 1-smooth}
 
         pt = (one_hot_key * logit).sum(1) + self.smooth
+
+        # USE mask to only calculate loss of negative pixels
+        mask = (target == 0).squeeze(1)
+        pt = torch.masked_select(pt, mask)
+
         logpt = pt.log()
 
         loss = -1 * torch.pow((1 - pt), self.gamma) * logpt

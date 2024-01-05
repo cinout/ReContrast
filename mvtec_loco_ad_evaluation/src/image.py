@@ -47,7 +47,7 @@ class DefectConfig:
 class DefectsConfig:
     def __init__(self, entries: Sequence[DefectConfig]):
         # Create a pixel_value -> entry mapping for faster lookup.
-        # TODO: this is an important dictionary
+        # FIXME: this is an important dictionary
         self.pixel_value_to_entry = {e.pixel_value: e for e in entries}
 
     @property
@@ -98,7 +98,7 @@ class GroundTruthChannel:
     def get_saturation_area(self):
         defect_area = self.get_defect_area()
         if self.defect_config.relative_saturation:
-            # TODO: saturation_threshold is either 1.0 or 0.5
+            # FIXME: saturation_threshold is either 1.0 or 0.5
             return int(self.defect_config.saturation_threshold * defect_area)
         else:
             # number of pixels that needs to be detected

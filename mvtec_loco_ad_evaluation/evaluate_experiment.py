@@ -130,7 +130,7 @@ def main():
     set_niceness(args.niceness)
 
     # Read the defects config file of the evaluated object.
-    # TODO: this is where the config file is read
+    # FIXME: this is where the config file is read
     defects_config_path = os.path.join(
         args.dataset_base_dir, args.object_name, "defects_config.json"
     )
@@ -299,7 +299,7 @@ def read_maps(gt_dir: str, anomaly_maps_test_dir: str, defects_config: DefectsCo
 
         if rel_path_no_ext in gt_map_rel_paths:
             gt_map_path = os.path.join(gt_dir, rel_path_no_ext)
-            # TODO: first place where defects_config is called after creation
+            # FIXME: first place where defects_config is called after creation
             gt_map = GroundTruthMap.read_from_png_dir(
                 png_dir=gt_map_path, defects_config=defects_config
             )

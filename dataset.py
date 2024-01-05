@@ -108,6 +108,7 @@ class LogicalAnomalyDataset(Dataset):
             gt = Image.open(each_path)
             gt = np.array(gt)
             gt = torch.tensor(gt)
+            gt = gt.unsqueeze(0)
             if overall_gt is not None:
                 overall_gt = torch.logical_or(overall_gt, gt)
             else:
@@ -123,11 +124,10 @@ class LogicalAnomalyDataset(Dataset):
         image = self.transform_image(img_path)
 
         gt_paths = self.gt[index]
-        overall_gt, individual_gts = self.transform_gt(
-            gt_paths
-        )  # shape: (1, raw_height, raw_width)
+        overall_gt, individual_gts = self.transform_gt(gt_paths)
 
-        # TODO: updated
+        # overall_gt.shape: [1, orig.height, orig.width]
+
         sample = {
             "image": image,
             "overall_gt": overall_gt,
