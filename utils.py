@@ -47,7 +47,7 @@ class IndividualGTLoss(torch.nn.Module):
             relative_saturation = pixel_detail["relative_saturation"]
 
             # calculate saturation_area (max pixels needed)
-            bool_array = gt.numpy().astype(np.bool_)
+            bool_array = gt.cpu().numpy().astype(np.bool_)
             defect_area = np.sum(bool_array)
             saturation_area = (
                 int(saturation_threshold * defect_area)
