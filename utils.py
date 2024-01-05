@@ -40,7 +40,7 @@ class IndividualGTLoss(torch.nn.Module):
         for gt in gts:
             # gt.shape: [1, 1, orig.h, orig.w]
             # find unique config for the gt
-            unique_values = sorted(torch.unique(gt).detach().numpy())
+            unique_values = sorted(torch.unique(gt).detach().cpu().numpy())
             pixel_type = unique_values[-1]
             pixel_detail = self.config[pixel_type]
             saturation_threshold = pixel_detail["saturation_threshold"]
