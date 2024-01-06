@@ -33,7 +33,7 @@ python -u recontrast_mvtecloco.py \
   --subdataset splicing_connectors \
   --seeds 10 \
   --stg1_ckpt outputs/stg1_only/outputs_20231212_234343_47_9_[sc]_sd10/trainings/mvtec_loco/splicing_connectors/model_stg1.pth \
-  --iters_stg2 6000 \
+  --iters_stg2 600 \
   --loss_mode average \
 
 my-job-stats -a -n -s
