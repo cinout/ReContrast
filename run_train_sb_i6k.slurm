@@ -33,8 +33,9 @@ python -u recontrast_mvtecloco.py \
   --subdataset screw_bag \
   --seeds 10 \
   --stg1_ckpt outputs/stg1_only/outputs_20231212_234343_9_7_[sb]_sd10/trainings/mvtec_loco/screw_bag/model_stg1.pth \
-  --iters_stg2 600 \
+  --iters_stg2 3000 \
   --loss_mode average \
+  --num_logicano 1.0 \
 
 my-job-stats -a -n -s
 ##

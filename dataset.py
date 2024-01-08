@@ -9,6 +9,7 @@ from torch.utils.data import Dataset
 import glob
 from PIL import Image, ImageOps
 import random
+import math
 
 torch.multiprocessing.set_sharing_strategy("file_system")
 
@@ -84,7 +85,10 @@ class LogicalAnomalyDataset(Dataset):
         all_logical_anomalies = sorted(os.listdir(logical_anomaly_path))
         selected_indices = [
             x.split(".png")[0]
-            for x in random.sample(all_logical_anomalies, k=num_logicano)
+            for x in random.sample(
+                all_logical_anomalies,
+                k=math.floor(num_logicano * len(all_logical_anomalies)),
+            )
         ]
         self.images = [logical_anomaly_path + f"/{idx}.png" for idx in selected_indices]
         # TODO: [LATER] test with geometric augmentions to images in the future
