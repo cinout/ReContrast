@@ -404,7 +404,7 @@ def train(args, seed):
             loss.backward()
             optimizer.step()
 
-            if iter % 40 == 0:
+            if iter % 20 == 0:
                 print(
                     "iter [{}/{}], loss:{:.4f}".format(
                         iter, args.iters_stg2, loss.item()
