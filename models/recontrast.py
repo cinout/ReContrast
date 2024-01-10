@@ -251,6 +251,9 @@ class LogicalMaskProducer(nn.Module):
                     logicano_input = torch.cat([refs[max_logicano_index], logicano])
                     intermediate_input = logicano_input.unsqueeze(0)
                 else:
+                    refs = x[:-2]  # [bs-2, 512, 8, 8]
+                    logicano = x[-2]
+                    normal = x[-1]
                     num_ref = refs.shape[0]
                     max_logicano_sim = -1000
                     max_logicano_index = None
