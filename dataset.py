@@ -136,6 +136,7 @@ class LogicalAnomalyDataset(Dataset):
             "image": image,
             "overall_gt": overall_gt,
             "individual_gts": individual_gts,
+            "img_path": img_path,
         }
         return sample
 

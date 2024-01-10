@@ -12,6 +12,7 @@ _ext
 *.jpg
 *.t
 build/
+runs/
 dist/
 wheels/
 datasets/

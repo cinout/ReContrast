@@ -1,4 +1,5 @@
 import math
+import cv2
 import torch
 from torchvision.datasets import ImageFolder
 import numpy as np
@@ -23,8 +24,11 @@ import glob
 from PIL import Image, ImageOps
 from dataset import transform_data, LogicalAnomalyDataset
 from utils import FocalLoss, IndividualGTLoss
+from torch.utils.tensorboard import SummaryWriter
 
-
+writer = (
+    SummaryWriter()
+)  # Writer will output to ./runs/ directory by default. You can change log_dir in here
 timestamp = (
     datetime.now().strftime("%Y%m%d_%H%M%S")
     + "_"
@@ -256,11 +260,10 @@ def train(args, seed):
     normal_dataloader = torch.utils.data.DataLoader(
         train_data,
         batch_size=1,
-        shuffle=True,
+        shuffle=False if args.debug_mode else True,
         # num_workers=1,
         pin_memory=True,
     )
-
     logicano_data = LogicalAnomalyDataset(
         num_logicano=args.num_logicano,
         subdataset=args.subdataset,
@@ -269,18 +272,18 @@ def train(args, seed):
     logicano_dataloader = torch.utils.data.DataLoader(
         logicano_data,
         batch_size=1,
-        shuffle=True,
+        shuffle=False if args.debug_mode else True,
         # num_workers=1,
         pin_memory=True,
     )
 
-    logicano_dataloader_infinite = InfiniteDataloader(logicano_dataloader)
     train_ref_dataloader_infinite = InfiniteDataloader(train_ref_dataloader)
+    logicano_dataloader_infinite = InfiniteDataloader(logicano_dataloader)
     normal_dataloader_infinite = InfiniteDataloader(normal_dataloader)
 
     """
     --[STAGE 2]--:
-    preparing model, including (1) freeze the stg1, (2) attention module, (3) DeConv module
+    preparing model
     """
 
     if args.stg1_ckpt is None:
@@ -323,7 +326,7 @@ def train(args, seed):
             list(model_stg2.channel_reducer.parameters())
             + list(model_stg2.self_att_module.parameters())
             + list(model_stg2.deconv.parameters()),
-            lr=2e-3,
+            lr=2e-3,  # TODO: is it too high?
             betas=(0.9, 0.999),
             weight_decay=1e-5,
         )
@@ -336,17 +339,28 @@ def train(args, seed):
         model_stg2.train()
         loss_focal = FocalLoss()
         loss_individual_gt = IndividualGTLoss(args)
+
+        if args.debug_mode:
+            logicano_fixed = list(logicano_dataloader)[
+                0
+            ]  # "datasets/loco/breakfast_box/test/logical_anomalies/073.png"
+            normal_fixed = list(normal_dataloader)[
+                0
+            ]  # "datasets/loco/breakfast_box/train/good/000.png"
+
         for iter, refs, logicano, normal in zip(
             tqdm_obj,
             train_ref_dataloader_infinite,
             logicano_dataloader_infinite,
             normal_dataloader_infinite,
         ):
+            if args.debug_mode:
+                logicano = logicano_fixed
+                normal = normal_fixed
             ref_images, label1 = refs
             normal_image, label2 = normal
             logicano_image = logicano["image"]
             overall_gt = logicano["overall_gt"]  # [1, 1, orig.h, orig.w]
-
             individual_gts = logicano["individual_gts"]
             _, _, orig_height, orig_width = overall_gt.shape
 
@@ -384,39 +398,132 @@ def train(args, seed):
                 predicted_masks[0], individual_gts
             )
             loss = loss_overall_negative + loss_individual_positive
+            writer.add_scalar("Loss/train", loss, iter)
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-            if iter % 50 == 0:
+            if iter % 40 == 0:
                 print(
                     "iter [{}/{}], loss:{:.4f}".format(
                         iter, args.iters_stg2, loss.item()
                     )
                 )
-
+        writer.flush()  # Call flush() method to make sure that all pending events have been written to disk
         model_stg2_dict = model_stg2.state_dict()
         torch.save(model_stg2_dict, os.path.join(train_output_dir, f"model_stg2.pth"))
-
     else:
         model_stg2_dict = torch.load(args.stg2_ckpt, map_location=device)
         model_stg2.load_state_dict(model_stg2_dict)
 
-    # compare key values
-    keys_with_diff = []
-    for key in model_stg1_dict.keys():
-        outcome = torch.all(
-            torch.eq(
-                model_stg1_dict[key],
-                model_stg2_dict["model_stg1." + key],
+    # # compare key values
+    # keys_with_diff = []
+    # for key in model_stg1_dict.keys():
+    #     outcome = torch.all(
+    #         torch.eq(
+    #             model_stg1_dict[key],
+    #             model_stg2_dict["model_stg1." + key],
+    #         )
+    #     )
+    #     if outcome == False:
+    #         keys_with_diff.append(key)
+    # print("------keys_with_diff------")
+    # print(keys_with_diff)
+    # print("------[END] keys_with_diff------")
+    writer.close()  # if you do not need the summary writer anymore, call close() method.
+
+    """
+    --[DEBUG_MODE]--
+    """
+
+    if args.debug_mode:
+        heatmap_alpha = 0.5
+
+        def normalizeData(data, minval, maxval):
+            return (data - minval) / (maxval - minval)
+
+        model_stg2.eval()
+        logicano_image = logicano_fixed["image"]
+        logicano_image = logicano_image.to(device)
+        normal_image, label2 = normal_fixed
+        normal_image = normal_image.to(device)
+        with torch.no_grad():
+            ref_dataloader = torch.utils.data.DataLoader(
+                train_data,
+                batch_size=math.floor(len(train_data) * 0.1),
+                shuffle=True,
+                num_workers=4,
+                drop_last=False,
             )
-        )
-        if outcome == False:
-            keys_with_diff.append(key)
-    print("------keys_with_diff------")
-    print(keys_with_diff)
-    print("------[END] keys_with_diff------")
+            for imgs, label in ref_dataloader:
+                imgs = imgs.to(device)
+                ref_features = model_stg2(
+                    imgs, get_ref_features=True
+                )  # [10%, 512, 8, 8]
+                break  # we just need the first 10%
+
+            # logic anomaly heatmap
+            _, _, map_logic_logicano = predict(
+                logicano_image, model_stg2, ref_features, args
+            )
+            map_logic_logicano = F.interpolate(
+                map_logic_logicano, (orig_height, orig_width), mode="bilinear"
+            )
+            map_logic_logicano = map_logic_logicano[0, 0].cpu().numpy()
+            pred_mask_logicano = np.uint8(
+                normalizeData(
+                    map_logic_logicano,
+                    np.min(map_logic_logicano),
+                    np.max(map_logic_logicano),
+                )
+                * 255
+            )
+            heatmap_logicano = cv2.applyColorMap(pred_mask_logicano, cv2.COLORMAP_JET)
+            raw_img_logicano = np.array(
+                cv2.imread(logicano_fixed["img_path"][0], cv2.IMREAD_COLOR)
+            )
+            overlay_logicano = heatmap_logicano * heatmap_alpha + raw_img_logicano * (
+                1.0 - heatmap_alpha
+            )
+            cv2.imwrite(
+                f"{args.iters_stg2}_{args.subdataset}_logicano_heatmap.jpg",
+                overlay_logicano,
+            )
+
+            # normal image heatmap
+            _, _, map_logic_normal = predict(
+                normal_image, model_stg2, ref_features, args
+            )
+            map_logic_normal = F.interpolate(
+                map_logic_normal, (orig_height, orig_width), mode="bilinear"
+            )
+            map_logic_normal = map_logic_normal[0, 0].cpu().numpy()
+            pred_mask_normal = np.uint8(
+                normalizeData(
+                    map_logic_normal,
+                    np.min(map_logic_normal),
+                    np.max(map_logic_normal),
+                )
+                * 255
+            )
+            heatmap_normal = cv2.applyColorMap(pred_mask_normal, cv2.COLORMAP_JET)
+
+            raw_img_normal = np.array(
+                cv2.imread(
+                    f"datasets/loco/{args.subdataset}/train/good/000.png",
+                    cv2.IMREAD_COLOR,
+                )
+            )
+            overlay_normal = heatmap_normal * heatmap_alpha + raw_img_normal * (
+                1.0 - heatmap_alpha
+            )
+            cv2.imwrite(
+                f"{args.iters_stg2}_{args.subdataset}_normal_heatmap.jpg",
+                overlay_normal,
+            )
+
+        exit()
 
     """
     --[EVALUATION]--:
@@ -554,6 +661,11 @@ if __name__ == "__main__":
         "--logicano_only",
         action="store_true",
         help="if true, then only use one logical anomaly during stg2 training",
+    )
+    parser.add_argument(
+        "--debug_mode",
+        action="store_true",
+        help="if true, then enter debug_mode",
     )
     parser.add_argument(
         "--loss_mode",
