@@ -334,7 +334,7 @@ def train(args, seed):
         training
         """
         writer = SummaryWriter(
-            log_dir=f"./runs/{timestamp}_{args.subdataset}_{args.iters_stg2}"
+            log_dir=f"./runs/{timestamp}_{args.subdataset}_{args.iters_stg2}_{args.loss_mode}"
         )  # Writer will output to ./runs/ directory by default. You can change log_dir in here
         tqdm_obj = tqdm(range(args.iters_stg2))
         model_stg2.train()

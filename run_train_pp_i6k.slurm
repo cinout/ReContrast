@@ -34,7 +34,7 @@ python -u recontrast_mvtecloco.py \
   --seeds 10 \
   --stg1_ckpt outputs/stg1_only/outputs_20231212_234343_87_4_[pp]_sd10/trainings/mvtec_loco/pushpins/model_stg1.pth \
   --iters_stg2 3000 \
-  --loss_mode average \
+  --loss_mode extreme \
   --num_logicano 1.0 \
   --debug_mode \
 
