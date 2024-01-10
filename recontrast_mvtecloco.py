@@ -324,7 +324,7 @@ def train(args, seed):
             list(model_stg2.channel_reducer.parameters())
             + list(model_stg2.self_att_module.parameters())
             + list(model_stg2.deconv.parameters()),
-            lr=2e-3,  # TODO: is it too high?
+            lr=2e-4,  # TODO: is it too high?  2e-3
             betas=(0.9, 0.999),
             weight_decay=1e-5,
         )
@@ -342,9 +342,10 @@ def train(args, seed):
         loss_individual_gt = IndividualGTLoss(args)
 
         if args.debug_mode:
-            logicano_fixed = list(logicano_dataloader)[
-                0
-            ]  # "datasets/loco/breakfast_box/test/logical_anomalies/073.png"
+            logicano_fixed = list(logicano_dataloader)[0]
+            # img_path = logicano_fixed["img_path"][0]
+            # "datasets/loco/breakfast_box/test/logical_anomalies/073.png"
+            # "datasets/loco/juice_bottle/test/logical_anomalies/008.png"
             normal_fixed = list(normal_dataloader)[
                 0
             ]  # "datasets/loco/breakfast_box/train/good/000.png"
