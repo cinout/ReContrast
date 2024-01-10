@@ -26,9 +26,7 @@ from dataset import transform_data, LogicalAnomalyDataset
 from utils import FocalLoss, IndividualGTLoss
 from torch.utils.tensorboard import SummaryWriter
 
-writer = (
-    SummaryWriter()
-)  # Writer will output to ./runs/ directory by default. You can change log_dir in here
+
 timestamp = (
     datetime.now().strftime("%Y%m%d_%H%M%S")
     + "_"
@@ -335,6 +333,9 @@ def train(args, seed):
         --[STAGE 2]--:
         training
         """
+        writer = SummaryWriter(
+            log_dir=f"./runs/{timestamp}_{args.subdataset}_{args.iters_stg2}"
+        )  # Writer will output to ./runs/ directory by default. You can change log_dir in here
         tqdm_obj = tqdm(range(args.iters_stg2))
         model_stg2.train()
         loss_focal = FocalLoss()
