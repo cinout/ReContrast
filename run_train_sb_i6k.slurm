@@ -36,6 +36,7 @@ python -u recontrast_mvtecloco.py \
   --iters_stg2 3000 \
   --loss_mode extreme \
   --num_logicano 1.0 \
+  --lr_stg2 0.00002 \
   --debug_mode \
   --debug_example_count 20 \
 

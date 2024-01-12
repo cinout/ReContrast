@@ -475,7 +475,7 @@ def train(args, seed):
                     imgs, get_ref_features=True
                 )  # [10%, 512, 8, 8]
                 break  # we just need the first 10%
-            debug_heatmap_folder = f"./debug_heatmaps_{timestamp}/"
+            debug_heatmap_folder = f"./debug_heatmaps_{args.subdataset}_{timestamp}/"
             os.makedirs(debug_heatmap_folder)
 
             # logic anomaly heatmap
