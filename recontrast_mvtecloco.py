@@ -334,7 +334,7 @@ def train(args, seed):
         training
         """
         writer = SummaryWriter(
-            log_dir=f"./runs/{timestamp}_{args.subdataset}_iter{args.iters_stg2}_{args.loss_mode}_count{args.debug_example_count}"
+            log_dir=f"./runs/{timestamp}_{args.subdataset}_iter{args.iters_stg2}_{args.loss_mode}_logicanocount{args.debug_logicano_count}_normalcount_{args.debug_normal_count}"
         )  # Writer will output to ./runs/ directory by default. You can change log_dir in here
         tqdm_obj = tqdm(range(args.iters_stg2))
         model_stg2.train()
@@ -342,7 +342,7 @@ def train(args, seed):
         loss_individual_gt = IndividualGTLoss(args)
 
         if args.debug_mode:
-            logicano_fixed = list(logicano_dataloader)[0 : args.debug_example_count]
+            logicano_fixed = list(logicano_dataloader)[0 : args.debug_logicano_count]
             # "datasets/loco/breakfast_box/test/logical_anomalies/073.png"
             # "datasets/loco/juice_bottle/test/logical_anomalies/008.png"
             # "datasets/loco/splicing_connectors/test/logical_anomalies/073.png"
@@ -358,7 +358,12 @@ def train(args, seed):
                 # num_workers=1,
                 pin_memory=True,
             )
-            normal_fixed = list(normal_dataloader)[0 : args.debug_example_count]
+            if args.debug_normal_count == "all":
+                normal_fixed = normal_dataloader
+            elif args.debug_normal_count == "follow":
+                normal_fixed = list(normal_dataloader)[0 : args.debug_logicano_count]
+            else:
+                raise Exception("Unimplemented debug_normal_count")
             # "datasets/loco/breakfast_box/train/good/000.png"
 
             logicano_fixed_dataloader_infinite = InfiniteDataloader(logicano_fixed)
@@ -699,7 +704,14 @@ if __name__ == "__main__":
         action="store_true",
         help="if true, then enter debug_mode",
     )
-    parser.add_argument("--debug_example_count", type=int, default=5)
+    parser.add_argument("--debug_logicano_count", type=int, default=5)
+    parser.add_argument(
+        "--debug_normal_count",
+        type=str,
+        choices=["all", "follow"],
+        default="all",
+        help="if all, use all normal images; if follow, use same number as debug_logicano_count",
+    )
     parser.add_argument(
         "--loss_mode",
         default="extreme",
