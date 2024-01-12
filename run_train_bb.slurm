@@ -11,7 +11,7 @@
 
 #SBATCH --job-name="bb"
 #SBATCH --account=punim1623
-#SBATCH --time=0-04:00:00
+#SBATCH --time=0-08:00:00
 
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
@@ -32,12 +32,13 @@ set -x
 python -u recontrast_mvtecloco.py \
   --subdataset breakfast_box \
   --seeds 10 \
-  --iters_stg2 3000 \
+  --iters_stg2 8000 \
   --stg1_ckpt outputs/stg1_only/outputs_20231212_234313_77_49_[bb]_sd10/trainings/mvtec_loco/breakfast_box/model_stg1.pth \
   --loss_mode extreme \
   --num_logicano 1.0 \
   --debug_mode \
   --debug_logicano_count 20 \
+  --lr_stg2 0.00005 \
 
 my-job-stats -a -n -s
 ##
