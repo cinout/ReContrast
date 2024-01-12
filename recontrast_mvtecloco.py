@@ -334,7 +334,7 @@ def train(args, seed):
         training
         """
         writer = SummaryWriter(
-            log_dir=f"./runs/{timestamp}_{args.subdataset}_iter{args.iters_stg2}_{args.loss_mode}"
+            log_dir=f"./runs/{timestamp}_{args.subdataset}_iter{args.iters_stg2}_{args.loss_mode}_count{args.debug_example_count}"
         )  # Writer will output to ./runs/ directory by default. You can change log_dir in here
         tqdm_obj = tqdm(range(args.iters_stg2))
         model_stg2.train()
@@ -342,7 +342,7 @@ def train(args, seed):
         loss_individual_gt = IndividualGTLoss(args)
 
         if args.debug_mode:
-            logicano_fixed = list(logicano_dataloader)[0:5]
+            logicano_fixed = list(logicano_dataloader)[0 : args.debug_example_count]
             # "datasets/loco/breakfast_box/test/logical_anomalies/073.png"
             # "datasets/loco/juice_bottle/test/logical_anomalies/008.png"
             # "datasets/loco/splicing_connectors/test/logical_anomalies/073.png"
@@ -358,7 +358,7 @@ def train(args, seed):
                 # num_workers=1,
                 pin_memory=True,
             )
-            normal_fixed = list(normal_dataloader)[0:5]
+            normal_fixed = list(normal_dataloader)[0 : args.debug_example_count]
             # "datasets/loco/breakfast_box/train/good/000.png"
 
             logicano_fixed_dataloader_infinite = InfiniteDataloader(logicano_fixed)
@@ -475,6 +475,8 @@ def train(args, seed):
                     imgs, get_ref_features=True
                 )  # [10%, 512, 8, 8]
                 break  # we just need the first 10%
+            debug_heatmap_folder = f"./debug_heatmaps_{timestamp}/"
+            os.makedirs(debug_heatmap_folder)
 
             # logic anomaly heatmap
             for each_logicano in logicano_fixed:
@@ -506,7 +508,10 @@ def train(args, seed):
                     + raw_img_logicano * (1.0 - heatmap_alpha)
                 )
                 cv2.imwrite(
-                    f"{args.subdataset}_logicano_{os.path.basename(path_name).split('.png')[0]}_iter_{args.iters_stg2}_{args.loss_mode}.jpg",
+                    os.path.join(
+                        debug_heatmap_folder,
+                        f"{args.subdataset}_logicano_{os.path.basename(path_name).split('.png')[0]}_iter_{args.iters_stg2}_{args.loss_mode}.jpg",
+                    ),
                     overlay_logicano,
                 )
             for each_normal in normal_fixed:
@@ -540,8 +545,12 @@ def train(args, seed):
                 overlay_normal = heatmap_normal * heatmap_alpha + raw_img_normal * (
                     1.0 - heatmap_alpha
                 )
+
                 cv2.imwrite(
-                    f"{args.subdataset}_normal_{os.path.basename(path_name[0]).split('.png')[0]}_iter_{args.iters_stg2}_{args.loss_mode}.jpg",
+                    os.path.join(
+                        debug_heatmap_folder,
+                        f"{args.subdataset}_normal_{os.path.basename(path_name[0]).split('.png')[0]}_iter_{args.iters_stg2}_{args.loss_mode}.jpg",
+                    ),
                     overlay_normal,
                 )
 
@@ -690,6 +699,7 @@ if __name__ == "__main__":
         action="store_true",
         help="if true, then enter debug_mode",
     )
+    parser.add_argument("--debug_example_count", type=int, default=5)
     parser.add_argument(
         "--loss_mode",
         default="extreme",

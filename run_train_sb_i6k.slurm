@@ -11,7 +11,7 @@
 
 #SBATCH --job-name="sb"
 #SBATCH --account=punim1623
-#SBATCH --time=0-02:00:00
+#SBATCH --time=0-03:00:00
 
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
@@ -37,6 +37,7 @@ python -u recontrast_mvtecloco.py \
   --loss_mode extreme \
   --num_logicano 1.0 \
   --debug_mode \
+  --debug_example_count 20 \
 
 my-job-stats -a -n -s
 ##
