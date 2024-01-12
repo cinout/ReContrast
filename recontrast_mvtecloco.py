@@ -258,7 +258,7 @@ def train(args, seed):
     normal_dataloader = torch.utils.data.DataLoader(
         train_data,
         batch_size=1,
-        shuffle=False if args.debug_mode else True,
+        shuffle=True,
         # num_workers=1,
         pin_memory=True,
     )
@@ -324,7 +324,7 @@ def train(args, seed):
             list(model_stg2.channel_reducer.parameters())
             + list(model_stg2.self_att_module.parameters())
             + list(model_stg2.deconv.parameters()),
-            lr=2e-4,  # TODO: is it too high?  2e-3
+            lr=args.lr_stg2,
             betas=(0.9, 0.999),
             weight_decay=1e-5,
         )
@@ -334,7 +334,7 @@ def train(args, seed):
         training
         """
         writer = SummaryWriter(
-            log_dir=f"./runs/{timestamp}_{args.subdataset}_{args.iters_stg2}_{args.loss_mode}"
+            log_dir=f"./runs/{timestamp}_{args.subdataset}_iter{args.iters_stg2}_{args.loss_mode}"
         )  # Writer will output to ./runs/ directory by default. You can change log_dir in here
         tqdm_obj = tqdm(range(args.iters_stg2))
         model_stg2.train()
@@ -342,23 +342,38 @@ def train(args, seed):
         loss_individual_gt = IndividualGTLoss(args)
 
         if args.debug_mode:
-            logicano_fixed = list(logicano_dataloader)[0]
-            # img_path = logicano_fixed["img_path"][0]
+            logicano_fixed = list(logicano_dataloader)[0:5]
             # "datasets/loco/breakfast_box/test/logical_anomalies/073.png"
             # "datasets/loco/juice_bottle/test/logical_anomalies/008.png"
-            normal_fixed = list(normal_dataloader)[
-                0
-            ]  # "datasets/loco/breakfast_box/train/good/000.png"
+            # "datasets/loco/splicing_connectors/test/logical_anomalies/073.png"
+            # "datasets/loco/pushpins/test/logical_anomalies/073.png"
+            # "datasets/loco/screw_bag/test/logical_anomalies/008.png"
+
+            normal_dataloader = torch.utils.data.DataLoader(
+                ImageFolderWithPath(
+                    root=train_path, transform=transform_data(args.image_size)
+                ),
+                batch_size=1,
+                shuffle=False,
+                # num_workers=1,
+                pin_memory=True,
+            )
+            normal_fixed = list(normal_dataloader)[0:5]
+            # "datasets/loco/breakfast_box/train/good/000.png"
+
+            logicano_fixed_dataloader_infinite = InfiniteDataloader(logicano_fixed)
+            normal_fixed_dataloader_infinite = InfiniteDataloader(normal_fixed)
 
         for iter, refs, logicano, normal in zip(
             tqdm_obj,
             train_ref_dataloader_infinite,
-            logicano_dataloader_infinite,
-            normal_dataloader_infinite,
+            logicano_fixed_dataloader_infinite
+            if args.debug_mode
+            else logicano_dataloader_infinite,
+            normal_fixed_dataloader_infinite
+            if args.debug_mode
+            else normal_dataloader_infinite,
         ):
-            if args.debug_mode:
-                logicano = logicano_fixed
-                normal = normal_fixed
             ref_images, label1 = refs
             normal_image, label2 = normal
             logicano_image = logicano["image"]
@@ -446,10 +461,6 @@ def train(args, seed):
             return (data - minval) / (maxval - minval)
 
         model_stg2.eval()
-        logicano_image = logicano_fixed["image"]
-        logicano_image = logicano_image.to(device)
-        normal_image, label2 = normal_fixed
-        normal_image = normal_image.to(device)
         with torch.no_grad():
             ref_dataloader = torch.utils.data.DataLoader(
                 train_data,
@@ -466,64 +477,73 @@ def train(args, seed):
                 break  # we just need the first 10%
 
             # logic anomaly heatmap
-            _, _, map_logic_logicano = predict(
-                logicano_image, model_stg2, ref_features, args
-            )
-            map_logic_logicano = F.interpolate(
-                map_logic_logicano, (orig_height, orig_width), mode="bilinear"
-            )
-            map_logic_logicano = map_logic_logicano[0, 0].cpu().numpy()
-            pred_mask_logicano = np.uint8(
-                normalizeData(
-                    map_logic_logicano,
-                    np.min(map_logic_logicano),
-                    np.max(map_logic_logicano),
-                )
-                * 255
-            )
-            heatmap_logicano = cv2.applyColorMap(pred_mask_logicano, cv2.COLORMAP_JET)
-            raw_img_logicano = np.array(
-                cv2.imread(logicano_fixed["img_path"][0], cv2.IMREAD_COLOR)
-            )
-            overlay_logicano = heatmap_logicano * heatmap_alpha + raw_img_logicano * (
-                1.0 - heatmap_alpha
-            )
-            cv2.imwrite(
-                f"{args.iters_stg2}_{args.subdataset}_logicano_heatmap.jpg",
-                overlay_logicano,
-            )
+            for each_logicano in logicano_fixed:
+                logicano_image = each_logicano["image"]
+                logicano_image = logicano_image.to(device)
 
-            # normal image heatmap
-            _, _, map_logic_normal = predict(
-                normal_image, model_stg2, ref_features, args
-            )
-            map_logic_normal = F.interpolate(
-                map_logic_normal, (orig_height, orig_width), mode="bilinear"
-            )
-            map_logic_normal = map_logic_normal[0, 0].cpu().numpy()
-            pred_mask_normal = np.uint8(
-                normalizeData(
-                    map_logic_normal,
-                    np.min(map_logic_normal),
-                    np.max(map_logic_normal),
+                _, _, map_logic_logicano = predict(
+                    logicano_image, model_stg2, ref_features, args
                 )
-                * 255
-            )
-            heatmap_normal = cv2.applyColorMap(pred_mask_normal, cv2.COLORMAP_JET)
+                map_logic_logicano = F.interpolate(
+                    map_logic_logicano, (orig_height, orig_width), mode="bilinear"
+                )
+                map_logic_logicano = map_logic_logicano[0, 0].cpu().numpy()
+                pred_mask_logicano = np.uint8(
+                    normalizeData(
+                        map_logic_logicano,
+                        np.min(map_logic_logicano),
+                        np.max(map_logic_logicano),
+                    )
+                    * 255
+                )
+                heatmap_logicano = cv2.applyColorMap(
+                    pred_mask_logicano, cv2.COLORMAP_JET
+                )
+                path_name = each_logicano["img_path"][0]
+                raw_img_logicano = np.array(cv2.imread(path_name, cv2.IMREAD_COLOR))
+                overlay_logicano = (
+                    heatmap_logicano * heatmap_alpha
+                    + raw_img_logicano * (1.0 - heatmap_alpha)
+                )
+                cv2.imwrite(
+                    f"{args.subdataset}_logicano_{os.path.basename(path_name).split('.png')[0]}_iter_{args.iters_stg2}_{args.loss_mode}.jpg",
+                    overlay_logicano,
+                )
+            for each_normal in normal_fixed:
+                normal_image, path_name = each_normal
+                normal_image = normal_image.to(device)
 
-            raw_img_normal = np.array(
-                cv2.imread(
-                    f"datasets/loco/{args.subdataset}/train/good/000.png",
-                    cv2.IMREAD_COLOR,
+                # normal image heatmap
+                _, _, map_logic_normal = predict(
+                    normal_image, model_stg2, ref_features, args
                 )
-            )
-            overlay_normal = heatmap_normal * heatmap_alpha + raw_img_normal * (
-                1.0 - heatmap_alpha
-            )
-            cv2.imwrite(
-                f"{args.iters_stg2}_{args.subdataset}_normal_heatmap.jpg",
-                overlay_normal,
-            )
+                map_logic_normal = F.interpolate(
+                    map_logic_normal, (orig_height, orig_width), mode="bilinear"
+                )
+                map_logic_normal = map_logic_normal[0, 0].cpu().numpy()
+                pred_mask_normal = np.uint8(
+                    normalizeData(
+                        map_logic_normal,
+                        np.min(map_logic_normal),
+                        np.max(map_logic_normal),
+                    )
+                    * 255
+                )
+                heatmap_normal = cv2.applyColorMap(pred_mask_normal, cv2.COLORMAP_JET)
+
+                raw_img_normal = np.array(
+                    cv2.imread(
+                        path_name[0],
+                        cv2.IMREAD_COLOR,
+                    )
+                )
+                overlay_normal = heatmap_normal * heatmap_alpha + raw_img_normal * (
+                    1.0 - heatmap_alpha
+                )
+                cv2.imwrite(
+                    f"{args.subdataset}_normal_{os.path.basename(path_name[0]).split('.png')[0]}_iter_{args.iters_stg2}_{args.loss_mode}.jpg",
+                    overlay_normal,
+                )
 
         exit()
 
@@ -643,6 +663,7 @@ if __name__ == "__main__":
     parser.add_argument("--image_size", type=int, default=256)
     parser.add_argument("--iters_stg1", type=int, default=3000)
     parser.add_argument("--iters_stg2", type=int, default=3000)
+    parser.add_argument("--lr_stg2", type=float, default=0.0002)
     parser.add_argument("--output_dir", type=str, default=f"outputs/output_{timestamp}")
     parser.add_argument("--dataset", type=str, default="mvtec_loco")
     parser.add_argument(
