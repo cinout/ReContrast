@@ -184,11 +184,14 @@ class DeConv(nn.Module):
 
 
 class LogicalMaskProducer(nn.Module):
-    def __init__(self, model_stg1, logicano_only=False, loss_mode="extreme") -> None:
+    def __init__(
+        self, model_stg1, logicano_only=False, loss_mode="extreme", attn_count=4
+    ) -> None:
         super().__init__()
         # choices
         self.logicano_only = logicano_only
         self.loss_mode = loss_mode
+        self.attn_count = attn_count
 
         # from stg1
         self.model_stg1 = model_stg1
@@ -196,7 +199,7 @@ class LogicalMaskProducer(nn.Module):
         # from stg2
         self.channel_reducer = nn.Linear(in_features=2048, out_features=512)
         self.self_att_module = nn.ModuleList(
-            [SelfAttentionBlock(dim=512) for j in range(4)]
+            [SelfAttentionBlock(dim=512) for j in range(self.attn_count)]
         )
         self.deconv = DeConv()
 

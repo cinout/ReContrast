@@ -38,6 +38,7 @@ python -u recontrast_mvtecloco.py \
   --logicano_select absolute \
   --num_logicano 10 \
   --lr_stg2 0.00005 \
+  --attn_count 10 \
   # --debug_mode \
   # --debug_logicano_count 20 \
 

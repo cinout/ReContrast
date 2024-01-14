@@ -314,6 +314,7 @@ def train(args, seed):
         model_stg1=model_stg1,
         logicano_only=args.logicano_only,
         loss_mode=args.loss_mode,
+        attn_count=args.attn_count,
     )
     model_stg2 = model_stg2.to(device)
 
@@ -732,6 +733,7 @@ if __name__ == "__main__":
         choices=["extreme", "average"],
         help="decides whether to use min or mean with ref to calculate loss",
     )
+    parser.add_argument("--attn_count", type=int, default=4)
 
     args = parser.parse_args()
     args.output_dir = args.output_dir + f"_[{subdataset_mapper[args.subdataset]}]"
