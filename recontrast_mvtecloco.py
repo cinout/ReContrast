@@ -263,7 +263,9 @@ def train(args, seed):
         pin_memory=True,
     )
     logicano_data = LogicalAnomalyDataset(
+        logicano_select=args.logicano_select,
         num_logicano=args.num_logicano,
+        percent_logicano=args.percent_logicano,
         subdataset=args.subdataset,
         image_size=args.image_size,
     )
@@ -669,10 +671,22 @@ if __name__ == "__main__":
     parser.add_argument("--seeds", type=int, default=[42], nargs="+")
     parser.add_argument("--batch_size_stg1", type=int, default=16)
     parser.add_argument(
-        "--num_logicano",
+        "--logicano_select",
+        type=str,
+        choices=["percent", "absolute"],
+        default="absolute",
+    )
+    parser.add_argument(
+        "--percent_logicano",
         type=float,
         default=0.1,
         help="proportion of real logical anomalies used in training",
+    )
+    parser.add_argument(
+        "--num_logicano",
+        type=int,
+        default=10,
+        help="number of real logical anomalies used in training",
     )
     parser.add_argument("--image_size", type=int, default=256)
     parser.add_argument("--iters_stg1", type=int, default=3000)

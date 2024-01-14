@@ -75,7 +75,9 @@ def get_strong_transforms(size, isize, mean_train=None, std_train=None):
 
 
 class LogicalAnomalyDataset(Dataset):
-    def __init__(self, num_logicano, subdataset, image_size) -> None:
+    def __init__(
+        self, logicano_select, num_logicano, percent_logicano, subdataset, image_size
+    ) -> None:
         super().__init__()
         self.image_size = image_size
         logical_anomaly_path = "datasets/loco/" + subdataset + "/test/logical_anomalies"
@@ -83,13 +85,22 @@ class LogicalAnomalyDataset(Dataset):
             "datasets/loco/" + subdataset + "/ground_truth/logical_anomalies"
         )
         all_logical_anomalies = sorted(os.listdir(logical_anomaly_path))
-        selected_indices = [
-            x.split(".png")[0]
-            for x in random.sample(
-                all_logical_anomalies,
-                k=math.floor(num_logicano * len(all_logical_anomalies)),
-            )
-        ]
+        if logicano_select == "percent":
+            selected_indices = [
+                x.split(".png")[0]
+                for x in random.sample(
+                    all_logical_anomalies,
+                    k=math.floor(percent_logicano * len(all_logical_anomalies)),
+                )
+            ]
+        elif logicano_select == "absolute":
+            selected_indices = [
+                x.split(".png")[0]
+                for x in random.sample(
+                    all_logical_anomalies,
+                    k=num_logicano,
+                )
+            ]
         self.images = [logical_anomaly_path + f"/{idx}.png" for idx in selected_indices]
         # TODO: [LATER] test with geometric augmentions to images in the future
         self.gt = [

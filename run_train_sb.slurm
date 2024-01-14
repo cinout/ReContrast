@@ -35,7 +35,8 @@ python -u recontrast_mvtecloco.py \
   --stg1_ckpt outputs/stg1_only/outputs_20231212_234343_9_7_[sb]_sd10/trainings/mvtec_loco/screw_bag/model_stg1.pth \
   --iters_stg2 8000 \
   --loss_mode extreme \
-  --num_logicano 1.0 \
+  --logicano_select absolute \
+  --num_logicano 10 \
   --lr_stg2 0.00005 \
   # --debug_mode \
   # --debug_logicano_count 20 \
