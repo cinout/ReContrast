@@ -148,12 +148,15 @@ class SelfAttentionBlock(nn.Module):
 class DeConv(nn.Module):
     def __init__(
         self,
+        attn_in_deconv=False,
         in_dim=1024,
         out_dim=2,
     ):
         super().__init__()
         self.relu = nn.ReLU(inplace=True)
         self.dropout = nn.Dropout(0.1)
+        self.attn_in_deconv = attn_in_deconv
+
         self.dec_1 = nn.ConvTranspose2d(
             in_channels=in_dim, out_channels=256, kernel_size=2, stride=2
         )
@@ -166,15 +169,43 @@ class DeConv(nn.Module):
         self.dec_4 = nn.ConvTranspose2d(
             in_channels=8, out_channels=out_dim, kernel_size=2, stride=2
         )
+        if self.attn_in_deconv:
+            # TODO: update?
+            self.attn_module_1 = nn.ModuleList(
+                [SelfAttentionBlock(dim=256) for j in range(4)]
+            )
+            self.attn_module_2 = nn.ModuleList(
+                [SelfAttentionBlock(dim=32) for j in range(4)]
+            )
 
     def forward(self, x):
         x = self.dec_1(x)
         x = self.relu(x)
-        x = self.dropout(x)
+        if self.attn_in_deconv:
+            # pass through attention module
+            B, C, H, W = x.shape  # ( 2 256 16 16)
+            x = x.reshape(B, C, -1)
+            x = x.permute(0, 2, 1)
+            for blk in self.attn_module_1:
+                x = blk(x, H, W)
+            x = x.permute(0, 1, 2)
+            x = x.reshape(B, C, H, W)
+        else:
+            x = self.dropout(x)
 
         x = self.dec_2(x)
         x = self.relu(x)
-        x = self.dropout(x)
+        if self.attn_in_deconv:
+            # pass through attention module
+            B, C, H, W = x.shape  # ( 2 32 64 64 )
+            x = x.reshape(B, C, -1)
+            x = x.permute(0, 2, 1)
+            for blk in self.attn_module_2:
+                x = blk(x, H, W)
+            x = x.permute(0, 1, 2)
+            x = x.reshape(B, C, H, W)
+        else:
+            x = self.dropout(x)
 
         x = self.dec_3(x)
         x = self.relu(x)
@@ -185,13 +216,19 @@ class DeConv(nn.Module):
 
 class LogicalMaskProducer(nn.Module):
     def __init__(
-        self, model_stg1, logicano_only=False, loss_mode="extreme", attn_count=4
+        self,
+        model_stg1,
+        logicano_only=False,
+        loss_mode="extreme",
+        attn_count=4,
+        attn_in_deconv=False,
     ) -> None:
         super().__init__()
         # choices
         self.logicano_only = logicano_only
         self.loss_mode = loss_mode
         self.attn_count = attn_count
+        self.attn_in_deconv = attn_in_deconv
 
         # from stg1
         self.model_stg1 = model_stg1
@@ -201,7 +238,7 @@ class LogicalMaskProducer(nn.Module):
         self.self_att_module = nn.ModuleList(
             [SelfAttentionBlock(dim=512) for j in range(self.attn_count)]
         )
-        self.deconv = DeConv()
+        self.deconv = DeConv(attn_in_deconv=self.attn_in_deconv)
 
         # prevent gradients
         for param in self.model_stg1.parameters():

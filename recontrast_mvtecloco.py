@@ -315,6 +315,7 @@ def train(args, seed):
         logicano_only=args.logicano_only,
         loss_mode=args.loss_mode,
         attn_count=args.attn_count,
+        attn_in_deconv=args.attn_in_deconv,
     )
     model_stg2 = model_stg2.to(device)
 
@@ -734,6 +735,11 @@ if __name__ == "__main__":
         help="decides whether to use min or mean with ref to calculate loss",
     )
     parser.add_argument("--attn_count", type=int, default=4)
+    parser.add_argument(
+        "--attn_in_deconv",
+        action="store_true",
+        help="if true, then use attention in deconv module",
+    )
 
     args = parser.parse_args()
     args.output_dir = args.output_dir + f"_[{subdataset_mapper[args.subdataset]}]"

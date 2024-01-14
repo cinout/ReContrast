@@ -7,6 +7,9 @@ python -u recontrast_mvtecloco.py \
   --logicano_select absolute \
   --num_logicano 10 \
   --debug_mode \
+  --lr_stg2 0.00005 \
+  --attn_in_deconv \
+  # --attn_count 10 \
   # --logicano_only \
   # --stg2_ckpt outputs/stg2_debug/output_20231219_161047_50_43_[bb]_sd10/trainings/mvtec_loco/breakfast_box/model_stg2.pth
 
