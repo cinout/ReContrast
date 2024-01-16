@@ -403,6 +403,29 @@ class LogicalMaskProducer(nn.Module):
                     x = self.model_stg1.encoder(x)
                     x = self.model_stg1.bottleneck(x)  # [bs, 2048, 8, 8]
 
+                    # TODO: remove this if condition later
+                    if (
+                        self.loss_mode == "extreme"
+                        and args is not None
+                        and args.debug_mode_2
+                    ):
+                        num_ref = ref_features.shape[0]
+                        max_sim = -1000
+                        max_index = None
+
+                        for i in range(num_ref):
+                            ref = ref_features[i]
+                            # sim = F.cosine_similarity(ref, x[0], dim=0).mean()
+                            sim = F.cosine_similarity(
+                                torch.mean(ref, dim=(1, 2)),
+                                torch.mean(x[0], dim=(1, 2)),
+                                dim=0,
+                            )
+                            if sim > max_sim:
+                                max_sim = sim
+                                max_index = i
+                        return max_index
+
                     x = x.permute(0, 2, 3, 1)
                     x = self.channel_reducer(x)
                     x = x.permute(0, 3, 1, 2)
@@ -432,8 +455,8 @@ class LogicalMaskProducer(nn.Module):
                             if sim > max_sim:
                                 max_sim = sim
                                 max_index = i
-                        if args is not None and args.debug_mode_2:
-                            return max_index
+                        # if args is not None and args.debug_mode_2:
+                        #     return max_index
                         intermediate_input = torch.cat(
                             [ref_features[max_index], x[0]]
                         ).unsqueeze(0)
