@@ -244,7 +244,7 @@ class LogicalMaskProducer(nn.Module):
         for param in self.model_stg1.parameters():
             param.requires_grad = False
 
-    def forward(self, x, get_ref_features=False, ref_features=None):
+    def forward(self, x, get_ref_features=False, ref_features=None, args=None):
         # x.shape: [bs, 3, 256, 256]
 
         if self.training:
@@ -432,16 +432,15 @@ class LogicalMaskProducer(nn.Module):
                             if sim > max_sim:
                                 max_sim = sim
                                 max_index = i
+                        if args is not None and args.debug_mode_2:
+                            return max_index
                         intermediate_input = torch.cat(
                             [ref_features[max_index], x[0]]
                         ).unsqueeze(0)
                         pred_mask = self.deconv(intermediate_input)
                         pred_mask = torch.softmax(pred_mask, dim=1)
-                        return (
-                            stg1_en,
-                            stg1_de,
-                            pred_mask,
-                        )
+
+                        return (stg1_en, stg1_de, pred_mask)
 
                     elif self.loss_mode == "average":
                         intermediate_input = [
