@@ -256,9 +256,14 @@ class LogicalMaskProducer(nn.Module):
                 x = self.model_stg1.bottleneck(x)  # [bs, 2048, 8, 8]
 
             if self.loss_mode == "extreme":
-                refs = x[:-2]  # [bs-2, 512, 8, 8]
+                if args.fixed_ref:
+                    refs = ref_features
+                else:
+                    refs = x[:-2]  # [bs-2, 2048, 8, 8]
+
                 logicano = x[-2]
                 normal = x[-1]
+
                 num_ref = refs.shape[0]
                 max_logicano_sim = -1000
                 max_logicano_index = None

@@ -332,6 +332,15 @@ def train(args, seed):
     )
     model_stg2 = model_stg2.to(device)
 
+    if args.fixed_ref:
+        model_stg2.eval()
+        for imgs, label in train_ref_dataloader:
+            imgs = imgs.to(device)
+            ref_features = model_stg2(
+                imgs, get_ref_features=True, args=args
+            )  # [10%, 512, 8, 8]
+        model_stg2.train()
+
     if args.stg2_ckpt is None:
         """
         --[STAGE 2]--:
@@ -412,13 +421,24 @@ def train(args, seed):
             individual_gts = [item.to(device) for item in individual_gts]
 
             if args.logicano_only:
-                image_batch = torch.cat([ref_images, logicano_image])
+                if args.fixed_ref:
+                    image_batch = logicano_image
+                else:
+                    image_batch = torch.cat([ref_images, logicano_image])
             else:
-                image_batch = torch.cat([ref_images, logicano_image, normal_image])
+                if args.fixed_ref:
+                    image_batch = torch.cat([logicano_image, normal_image])
+                else:
+                    image_batch = torch.cat([ref_images, logicano_image, normal_image])
 
-            predicted_masks = model_stg2(
-                image_batch, args=args
-            )  # [2, 2, 256, 256], bs(1) logical_ano, bs(2) normal, both softmaxed
+            if args.fixed_ref:
+                predicted_masks = model_stg2(
+                    image_batch, args=args, ref_features=ref_features
+                )
+            else:
+                predicted_masks = model_stg2(
+                    image_batch, args=args
+                )  # [2, 2, 256, 256], bs(1) logical_ano, bs(2) normal, both softmaxed
             predicted_masks = F.interpolate(
                 predicted_masks, (orig_height, orig_width), mode="bilinear"
             )
@@ -591,14 +611,8 @@ def train(args, seed):
         #     train_data = ImageFolderWithPath(
         #         root=train_path, transform=transform_data(args.image_size)
         #     )
-        if args.fixed_ref:
-            for imgs, label in train_ref_dataloader:
-                imgs = imgs.to(device)
-                ref_features = model_stg2(
-                    imgs, get_ref_features=True, args=args
-                )  # [10%, 512, 8, 8]
-                break
-        else:
+
+        if not args.fixed_ref:
             ref_dataloader = torch.utils.data.DataLoader(
                 train_data,
                 batch_size=math.floor(len(train_data) * 0.1),
