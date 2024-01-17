@@ -802,9 +802,9 @@ if __name__ == "__main__":
         help="if true, then use attention in deconv module",
     )
     parser.add_argument(
-        "--attn_in_deconv",
+        "--fixed_ref",
         action="store_true",
-        help="if true, then use attention in deconv module",
+        help="if true, then use 50 percent of ",
     )
     parser.add_argument(
         "--similarity_priority",
