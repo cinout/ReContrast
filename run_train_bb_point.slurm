@@ -9,7 +9,7 @@
 ###SBATCH --qos=gpgpudeeplearn
 ###SBATCH --constraint=dlg4|dlg5
 
-#SBATCH --job-name="jb"
+#SBATCH --job-name="bb"
 #SBATCH --account=punim1623
 #SBATCH --time=0-05:00:00
 
@@ -30,17 +30,18 @@ set -e
 set -x
 
 python -u recontrast_mvtecloco.py \
-  --subdataset juice_bottle \
+  --subdataset breakfast_box \
   --seeds 10 \
-  --stg1_ckpt outputs/stg1_only/outputs_20231212_234342_94_45_[jb]_sd10/trainings/mvtec_loco/juice_bottle/model_stg1.pth \
   --iters_stg2 8000 \
+  --stg1_ckpt outputs/stg1_only/outputs_20231212_234313_77_49_[bb]_sd10/trainings/mvtec_loco/breakfast_box/model_stg1.pth \
   --loss_mode extreme \
   --logicano_select absolute \
   --num_logicano 10 \
   --lr_stg2 0.00005 \
   --attn_count 10 \
   --attn_in_deconv \
-  --note "similarity first" \
+  --similarity_priority pointwise \
+  --note "similarity first, pointwise" \
   # --debug_mode \
   # --debug_logicano_count 20 \
 

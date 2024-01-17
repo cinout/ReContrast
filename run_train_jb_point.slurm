@@ -40,7 +40,8 @@ python -u recontrast_mvtecloco.py \
   --lr_stg2 0.00005 \
   --attn_count 10 \
   --attn_in_deconv \
-  --note "similarity first" \
+  --similarity_priority pointwise \
+  --note "similarity first, pointwise" \
   # --debug_mode \
   # --debug_logicano_count 20 \
 

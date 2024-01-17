@@ -59,7 +59,7 @@ def predict(
     #     return max_index
     # else:
     en, de, pred_mask = model_stg2(
-        image, get_ref_features=False, ref_features=ref_features
+        image, get_ref_features=False, ref_features=ref_features, args=args
     )
 
     map_logic = pred_mask[:, 1, :, :].unsqueeze(1)
@@ -405,7 +405,7 @@ def train(args, seed):
                 image_batch = torch.cat([ref_images, logicano_image, normal_image])
 
             predicted_masks = model_stg2(
-                image_batch
+                image_batch, args=args
             )  # [2, 2, 256, 256], bs(1) logical_ano, bs(2) normal, both softmaxed
             predicted_masks = F.interpolate(
                 predicted_masks, (orig_height, orig_width), mode="bilinear"
@@ -484,7 +484,7 @@ def train(args, seed):
             for imgs, label in ref_dataloader:
                 imgs = imgs.to(device)
                 ref_features = model_stg2(
-                    imgs, get_ref_features=True
+                    imgs, get_ref_features=True, args=args
                 )  # [10%, 512, 8, 8]
                 break  # we just need the first 10%
             debug_heatmap_folder = f"./debug_heatmaps_{args.subdataset}_{timestamp}/"
@@ -800,6 +800,18 @@ if __name__ == "__main__":
         "--attn_in_deconv",
         action="store_true",
         help="if true, then use attention in deconv module",
+    )
+    parser.add_argument(
+        "--attn_in_deconv",
+        action="store_true",
+        help="if true, then use attention in deconv module",
+    )
+    parser.add_argument(
+        "--similarity_priority",
+        type=str,
+        choices=["flatten", "pointwise"],
+        default="flatten",
+        help="how to calcualte similarity between ref and input",
     )
 
     args = parser.parse_args()

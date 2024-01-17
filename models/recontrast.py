@@ -266,21 +266,32 @@ class LogicalMaskProducer(nn.Module):
                 max_normal_index = None
                 for i in range(num_ref):
                     ref = refs[i]
-                    # logicano_sim = F.cosine_similarity(ref, logicano, dim=0).mean()
-                    logicano_sim = F.cosine_similarity(
-                        torch.mean(ref, dim=(1, 2)),
-                        torch.mean(logicano, dim=(1, 2)),
-                        dim=0,
-                    )
+
+                    if args.similarity_priority == "pointwise":
+                        logicano_sim = F.cosine_similarity(ref, logicano, dim=0).mean()
+                    elif args.similarity_priority == "flatten":
+                        logicano_sim = F.cosine_similarity(
+                            torch.mean(ref, dim=(1, 2)),
+                            torch.mean(logicano, dim=(1, 2)),
+                            dim=0,
+                        )
+                    else:
+                        raise Exception("Unimplemented similarity_priority")
                     if logicano_sim > max_logicano_sim:
                         max_logicano_sim = logicano_sim
                         max_logicano_index = i
-                    # normal_sim = F.cosine_similarity(ref, normal, dim=0).mean()
-                    normal_sim = F.cosine_similarity(
-                        torch.mean(ref, dim=(1, 2)),
-                        torch.mean(normal, dim=(1, 2)),
-                        dim=0,
-                    )
+
+                    if args.similarity_priority == "pointwise":
+                        normal_sim = F.cosine_similarity(ref, normal, dim=0).mean()
+                    elif args.similarity_priority == "flatten":
+                        normal_sim = F.cosine_similarity(
+                            torch.mean(ref, dim=(1, 2)),
+                            torch.mean(normal, dim=(1, 2)),
+                            dim=0,
+                        )
+                    else:
+                        raise Exception("Unimplemented similarity_priority")
+
                     if normal_sim > max_normal_sim:
                         max_normal_sim = normal_sim
                         max_normal_index = i
@@ -493,12 +504,16 @@ class LogicalMaskProducer(nn.Module):
 
                         for i in range(num_ref):
                             ref = ref_features[i]
-                            # sim = F.cosine_similarity(ref, x[0], dim=0).mean()
-                            sim = F.cosine_similarity(
-                                torch.mean(ref, dim=(1, 2)),
-                                torch.mean(x[0], dim=(1, 2)),
-                                dim=0,
-                            )
+                            if args.similarity_priority == "pointwise":
+                                sim = F.cosine_similarity(ref, x[0], dim=0).mean()
+                            elif args.similarity_priority == "flatten":
+                                sim = F.cosine_similarity(
+                                    torch.mean(ref, dim=(1, 2)),
+                                    torch.mean(x[0], dim=(1, 2)),
+                                    dim=0,
+                                )
+                            else:
+                                raise Exception("Unimplemented similarity_priority")
                             if sim > max_sim:
                                 max_sim = sim
                                 max_index = i
