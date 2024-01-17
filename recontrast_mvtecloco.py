@@ -251,13 +251,23 @@ def train(args, seed):
     --[STAGE 2]--:
     preparing datasets
     """
-    train_ref_dataloader = torch.utils.data.DataLoader(
-        train_data,
-        batch_size=8,
-        shuffle=True,
-        # num_workers=1,
-        pin_memory=True,
-    )
+    if args.fixed_ref:
+        used_ref_count = math.floor(len(train_data) * 0.1)
+        train_ref_dataloader = torch.utils.data.DataLoader(
+            list(train_data)[:used_ref_count],
+            batch_size=used_ref_count,
+            shuffle=False,
+            # num_workers=1,
+            pin_memory=True,
+        )
+    else:
+        train_ref_dataloader = torch.utils.data.DataLoader(
+            train_data,
+            batch_size=8,
+            shuffle=True,
+            # num_workers=1,
+            pin_memory=True,
+        )
     normal_dataloader = torch.utils.data.DataLoader(
         train_data,
         batch_size=1,
@@ -348,43 +358,45 @@ def train(args, seed):
         loss_focal = FocalLoss()
         loss_individual_gt = IndividualGTLoss(args)
 
-        if args.debug_mode:
-            logicano_fixed = list(logicano_dataloader)[0 : args.debug_logicano_count]
-            # "datasets/loco/breakfast_box/test/logical_anomalies/073.png"
-            # "datasets/loco/juice_bottle/test/logical_anomalies/008.png"
-            # "datasets/loco/splicing_connectors/test/logical_anomalies/073.png"
-            # "datasets/loco/pushpins/test/logical_anomalies/073.png"
-            # "datasets/loco/screw_bag/test/logical_anomalies/008.png"
+        # if args.debug_mode:
+        #     logicano_fixed = list(logicano_dataloader)[0 : args.debug_logicano_count]
+        #     # "datasets/loco/breakfast_box/test/logical_anomalies/073.png"
+        #     # "datasets/loco/juice_bottle/test/logical_anomalies/008.png"
+        #     # "datasets/loco/splicing_connectors/test/logical_anomalies/073.png"
+        #     # "datasets/loco/pushpins/test/logical_anomalies/073.png"
+        #     # "datasets/loco/screw_bag/test/logical_anomalies/008.png"
 
-            normal_dataloader = torch.utils.data.DataLoader(
-                ImageFolderWithPath(
-                    root=train_path, transform=transform_data(args.image_size)
-                ),
-                batch_size=1,
-                shuffle=False,
-                # num_workers=1,
-                pin_memory=True,
-            )
-            if args.debug_normal_count == "all":
-                normal_fixed = normal_dataloader
-            elif args.debug_normal_count == "follow":
-                normal_fixed = list(normal_dataloader)[0 : args.debug_logicano_count]
-            else:
-                raise Exception("Unimplemented debug_normal_count")
-            # "datasets/loco/breakfast_box/train/good/000.png"
+        #     normal_dataloader = torch.utils.data.DataLoader(
+        #         ImageFolderWithPath(
+        #             root=train_path, transform=transform_data(args.image_size)
+        #         ),
+        #         batch_size=1,
+        #         shuffle=False,
+        #         # num_workers=1,
+        #         pin_memory=True,
+        #     )
+        #     if args.debug_normal_count == "all":
+        #         normal_fixed = normal_dataloader
+        #     elif args.debug_normal_count == "follow":
+        #         normal_fixed = list(normal_dataloader)[0 : args.debug_logicano_count]
+        #     else:
+        #         raise Exception("Unimplemented debug_normal_count")
+        #     # "datasets/loco/breakfast_box/train/good/000.png"
 
-            logicano_fixed_dataloader_infinite = InfiniteDataloader(logicano_fixed)
-            normal_fixed_dataloader_infinite = InfiniteDataloader(normal_fixed)
+        #     logicano_fixed_dataloader_infinite = InfiniteDataloader(logicano_fixed)
+        #     normal_fixed_dataloader_infinite = InfiniteDataloader(normal_fixed)
 
         for iter, refs, logicano, normal in zip(
             tqdm_obj,
             train_ref_dataloader_infinite,
-            logicano_fixed_dataloader_infinite
-            if args.debug_mode
-            else logicano_dataloader_infinite,
-            normal_fixed_dataloader_infinite
-            if args.debug_mode
-            else normal_dataloader_infinite,
+            logicano_dataloader_infinite,
+            normal_dataloader_infinite
+            # logicano_fixed_dataloader_infinite
+            # if args.debug_mode
+            # else logicano_dataloader_infinite,
+            # normal_fixed_dataloader_infinite
+            # if args.debug_mode
+            # else normal_dataloader_infinite,
         ):
             ref_images, label1 = refs
             normal_image, label2 = normal
@@ -466,107 +478,107 @@ def train(args, seed):
     --[DEBUG_MODE]--
     """
 
-    if args.debug_mode:
-        heatmap_alpha = 0.5
+    # if args.debug_mode:
+    #     heatmap_alpha = 0.5
 
-        def normalizeData(data, minval, maxval):
-            return (data - minval) / (maxval - minval)
+    #     def normalizeData(data, minval, maxval):
+    #         return (data - minval) / (maxval - minval)
 
-        model_stg2.eval()
-        with torch.no_grad():
-            ref_dataloader = torch.utils.data.DataLoader(
-                train_data,
-                batch_size=math.floor(len(train_data) * 0.1),
-                shuffle=True,
-                num_workers=4,
-                drop_last=False,
-            )
-            for imgs, label in ref_dataloader:
-                imgs = imgs.to(device)
-                ref_features = model_stg2(
-                    imgs, get_ref_features=True, args=args
-                )  # [10%, 512, 8, 8]
-                break  # we just need the first 10%
-            debug_heatmap_folder = f"./debug_heatmaps_{args.subdataset}_{timestamp}/"
-            os.makedirs(debug_heatmap_folder)
+    #     model_stg2.eval()
+    #     with torch.no_grad():
+    #         ref_dataloader = torch.utils.data.DataLoader(
+    #             train_data,
+    #             batch_size=math.floor(len(train_data) * 0.1),
+    #             shuffle=True,
+    #             num_workers=4,
+    #             drop_last=False,
+    #         )
+    #         for imgs, label in ref_dataloader:
+    #             imgs = imgs.to(device)
+    #             ref_features = model_stg2(
+    #                 imgs, get_ref_features=True, args=args
+    #             )  # [10%, 512, 8, 8]
+    #             break  # we just need the first 10%
+    #         debug_heatmap_folder = f"./debug_heatmaps_{args.subdataset}_{timestamp}/"
+    #         os.makedirs(debug_heatmap_folder)
 
-            # logic anomaly heatmap
-            for each_logicano in logicano_fixed:
-                logicano_image = each_logicano["image"]
-                logicano_image = logicano_image.to(device)
+    #         # logic anomaly heatmap
+    #         for each_logicano in logicano_fixed:
+    #             logicano_image = each_logicano["image"]
+    #             logicano_image = logicano_image.to(device)
 
-                _, _, map_logic_logicano = predict(
-                    logicano_image, model_stg2, ref_features, args
-                )
-                map_logic_logicano = F.interpolate(
-                    map_logic_logicano, (orig_height, orig_width), mode="bilinear"
-                )
-                map_logic_logicano = map_logic_logicano[0, 0].cpu().numpy()
-                pred_mask_logicano = np.uint8(
-                    normalizeData(
-                        map_logic_logicano,
-                        np.min(map_logic_logicano),
-                        np.max(map_logic_logicano),
-                    )
-                    * 255
-                )
-                heatmap_logicano = cv2.applyColorMap(
-                    pred_mask_logicano, cv2.COLORMAP_JET
-                )
-                path_name = each_logicano["img_path"][0]
-                raw_img_logicano = np.array(cv2.imread(path_name, cv2.IMREAD_COLOR))
-                overlay_logicano = (
-                    heatmap_logicano * heatmap_alpha
-                    + raw_img_logicano * (1.0 - heatmap_alpha)
-                )
-                cv2.imwrite(
-                    os.path.join(
-                        debug_heatmap_folder,
-                        f"{args.subdataset}_logicano_{os.path.basename(path_name).split('.png')[0]}_iter_{args.iters_stg2}_{args.loss_mode}.jpg",
-                    ),
-                    overlay_logicano,
-                )
-            for each_normal in normal_fixed:
-                normal_image, path_name = each_normal
-                normal_image = normal_image.to(device)
+    #             _, _, map_logic_logicano = predict(
+    #                 logicano_image, model_stg2, ref_features, args
+    #             )
+    #             map_logic_logicano = F.interpolate(
+    #                 map_logic_logicano, (orig_height, orig_width), mode="bilinear"
+    #             )
+    #             map_logic_logicano = map_logic_logicano[0, 0].cpu().numpy()
+    #             pred_mask_logicano = np.uint8(
+    #                 normalizeData(
+    #                     map_logic_logicano,
+    #                     np.min(map_logic_logicano),
+    #                     np.max(map_logic_logicano),
+    #                 )
+    #                 * 255
+    #             )
+    #             heatmap_logicano = cv2.applyColorMap(
+    #                 pred_mask_logicano, cv2.COLORMAP_JET
+    #             )
+    #             path_name = each_logicano["img_path"][0]
+    #             raw_img_logicano = np.array(cv2.imread(path_name, cv2.IMREAD_COLOR))
+    #             overlay_logicano = (
+    #                 heatmap_logicano * heatmap_alpha
+    #                 + raw_img_logicano * (1.0 - heatmap_alpha)
+    #             )
+    #             cv2.imwrite(
+    #                 os.path.join(
+    #                     debug_heatmap_folder,
+    #                     f"{args.subdataset}_logicano_{os.path.basename(path_name).split('.png')[0]}_iter_{args.iters_stg2}_{args.loss_mode}.jpg",
+    #                 ),
+    #                 overlay_logicano,
+    #             )
+    #         for each_normal in normal_fixed:
+    #             normal_image, path_name = each_normal
+    #             normal_image = normal_image.to(device)
 
-                # normal image heatmap
-                _, _, map_logic_normal = predict(
-                    normal_image, model_stg2, ref_features, args
-                )
-                map_logic_normal = F.interpolate(
-                    map_logic_normal, (orig_height, orig_width), mode="bilinear"
-                )
-                map_logic_normal = map_logic_normal[0, 0].cpu().numpy()
-                pred_mask_normal = np.uint8(
-                    normalizeData(
-                        map_logic_normal,
-                        np.min(map_logic_normal),
-                        np.max(map_logic_normal),
-                    )
-                    * 255
-                )
-                heatmap_normal = cv2.applyColorMap(pred_mask_normal, cv2.COLORMAP_JET)
+    #             # normal image heatmap
+    #             _, _, map_logic_normal = predict(
+    #                 normal_image, model_stg2, ref_features, args
+    #             )
+    #             map_logic_normal = F.interpolate(
+    #                 map_logic_normal, (orig_height, orig_width), mode="bilinear"
+    #             )
+    #             map_logic_normal = map_logic_normal[0, 0].cpu().numpy()
+    #             pred_mask_normal = np.uint8(
+    #                 normalizeData(
+    #                     map_logic_normal,
+    #                     np.min(map_logic_normal),
+    #                     np.max(map_logic_normal),
+    #                 )
+    #                 * 255
+    #             )
+    #             heatmap_normal = cv2.applyColorMap(pred_mask_normal, cv2.COLORMAP_JET)
 
-                raw_img_normal = np.array(
-                    cv2.imread(
-                        path_name[0],
-                        cv2.IMREAD_COLOR,
-                    )
-                )
-                overlay_normal = heatmap_normal * heatmap_alpha + raw_img_normal * (
-                    1.0 - heatmap_alpha
-                )
+    #             raw_img_normal = np.array(
+    #                 cv2.imread(
+    #                     path_name[0],
+    #                     cv2.IMREAD_COLOR,
+    #                 )
+    #             )
+    #             overlay_normal = heatmap_normal * heatmap_alpha + raw_img_normal * (
+    #                 1.0 - heatmap_alpha
+    #             )
 
-                cv2.imwrite(
-                    os.path.join(
-                        debug_heatmap_folder,
-                        f"{args.subdataset}_normal_{os.path.basename(path_name[0]).split('.png')[0]}_iter_{args.iters_stg2}_{args.loss_mode}.jpg",
-                    ),
-                    overlay_normal,
-                )
+    #             cv2.imwrite(
+    #                 os.path.join(
+    #                     debug_heatmap_folder,
+    #                     f"{args.subdataset}_normal_{os.path.basename(path_name[0]).split('.png')[0]}_iter_{args.iters_stg2}_{args.loss_mode}.jpg",
+    #                 ),
+    #                 overlay_normal,
+    #             )
 
-        exit()
+    #     exit()
 
     """
     --[EVALUATION]--:
@@ -579,21 +591,29 @@ def train(args, seed):
         #     train_data = ImageFolderWithPath(
         #         root=train_path, transform=transform_data(args.image_size)
         #     )
-        ref_dataloader = torch.utils.data.DataLoader(
-            train_data,
-            batch_size=math.floor(len(train_data) * 0.1),
-            shuffle=True,
-            num_workers=4,
-            drop_last=False,
-        )
-        for imgs, label in ref_dataloader:
-            imgs = imgs.to(device)
-            ref_features = model_stg2(
-                imgs, get_ref_features=True, args=args
-            )  # [10%, 512, 8, 8]
-            # if args.debug_mode_2:
-            #     ref_path = list(label)
-            break  # we just need the first 10%
+        if args.fixed_ref:
+            for imgs, label in train_ref_dataloader:
+                imgs = imgs.to(device)
+                ref_features = model_stg2(
+                    imgs, get_ref_features=True, args=args
+                )  # [10%, 512, 8, 8]
+                break
+        else:
+            ref_dataloader = torch.utils.data.DataLoader(
+                train_data,
+                batch_size=math.floor(len(train_data) * 0.1),
+                shuffle=True,
+                num_workers=4,
+                drop_last=False,
+            )
+            for imgs, label in ref_dataloader:
+                imgs = imgs.to(device)
+                ref_features = model_stg2(
+                    imgs, get_ref_features=True, args=args
+                )  # [10%, 512, 8, 8]
+                # if args.debug_mode_2:
+                #     ref_path = list(label)
+                break  # we just need the first 10%
 
         # if args.debug_mode_2:
         #     q_structure_start = torch.tensor(0.1)
@@ -804,7 +824,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--fixed_ref",
         action="store_true",
-        help="if true, then use 50 percent of ",
+        help="if true, then use 10 percent of train images as fixed ref throughout training/validation/eval",
     )
     parser.add_argument(
         "--similarity_priority",
