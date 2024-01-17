@@ -21,7 +21,7 @@ eval "$(conda shell.bash hook)"
 conda activate eff
 
 timestamp="20240117_153545_57_22_[bb]_sd10"
-folder_name="simi_first/"
+folder_name="simi_point/"
 
 python -u mvtec_loco_ad_evaluation/evaluate_experiment.py \
   --object_name "breakfast_box" \
