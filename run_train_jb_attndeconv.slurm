@@ -11,7 +11,7 @@
 
 #SBATCH --job-name="jb"
 #SBATCH --account=punim1623
-#SBATCH --time=0-08:00:00
+#SBATCH --time=0-05:00:00
 
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
@@ -40,6 +40,7 @@ python -u recontrast_mvtecloco.py \
   --lr_stg2 0.00005 \
   --attn_count 10 \
   --attn_in_deconv \
+  --note "similarity first" \
   # --debug_mode \
   # --debug_logicano_count 20 \
 

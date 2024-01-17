@@ -102,7 +102,6 @@ class LogicalAnomalyDataset(Dataset):
                 )
             ]
         self.images = [logical_anomaly_path + f"/{idx}.png" for idx in selected_indices]
-        # TODO: [LATER] test with geometric augmentions to images in the future
         self.gt = [
             glob.glob(logical_anomaly_gt_path + f"/{idx}/*.png")
             for idx in selected_indices

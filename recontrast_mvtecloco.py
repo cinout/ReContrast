@@ -52,15 +52,15 @@ def predict(
     q_logic_start=None,
     q_logic_end=None,
 ):
-    if args.debug_mode_2 and q_structure_start is not None:
-        max_index = model_stg2(
-            image, get_ref_features=False, ref_features=ref_features, args=args
-        )
-        return max_index
-    else:
-        en, de, pred_mask = model_stg2(
-            image, get_ref_features=False, ref_features=ref_features
-        )
+    # if args.debug_mode_2 and q_structure_start is not None:
+    #     max_index = model_stg2(
+    #         image, get_ref_features=False, ref_features=ref_features, args=args
+    #     )
+    #     return max_index
+    # else:
+    en, de, pred_mask = model_stg2(
+        image, get_ref_features=False, ref_features=ref_features
+    )
 
     map_logic = pred_mask[:, 1, :, :].unsqueeze(1)
 
@@ -575,11 +575,10 @@ def train(args, seed):
     model_stg2.eval()
     with torch.no_grad():
         # obtain ref features from train set using p%
-        # TODO: [LATER] better algorithms than random?
-        if args.debug_mode_2:
-            train_data = ImageFolderWithPath(
-                root=train_path, transform=transform_data(args.image_size)
-            )
+        # if args.debug_mode_2:
+        #     train_data = ImageFolderWithPath(
+        #         root=train_path, transform=transform_data(args.image_size)
+        #     )
         ref_dataloader = torch.utils.data.DataLoader(
             train_data,
             batch_size=math.floor(len(train_data) * 0.1),
@@ -589,43 +588,44 @@ def train(args, seed):
         )
         for imgs, label in ref_dataloader:
             imgs = imgs.to(device)
-            ref_features = model_stg2(imgs, get_ref_features=True)  # [10%, 512, 8, 8]
-            if args.debug_mode_2:
-                ref_path = list(label)
+            ref_features = model_stg2(
+                imgs, get_ref_features=True, args=args
+            )  # [10%, 512, 8, 8]
+            # if args.debug_mode_2:
+            #     ref_path = list(label)
             break  # we just need the first 10%
 
-        if args.debug_mode_2:
-            q_structure_start = torch.tensor(0.1)
-            q_structure_end = torch.tensor(0.9)
-            q_logic_start = torch.tensor(0.1)
-            q_logic_end = torch.tensor(0.9)
-        else:
-            # create validation dataloader
-            validation_path = "datasets/loco/" + args.subdataset + "/validation"
-            validation_set = ImageFolder(validation_path)
+        # if args.debug_mode_2:
+        #     q_structure_start = torch.tensor(0.1)
+        #     q_structure_end = torch.tensor(0.9)
+        #     q_logic_start = torch.tensor(0.1)
+        #     q_logic_end = torch.tensor(0.9)
+        # else:
 
-            # calculate quantiles using validation set
-            maps_structure = []
-            maps_logic = []
-            for raw_image, label in tqdm(validation_set):
-                orig_width = raw_image.width
-                orig_height = raw_image.height
-                image = transform_data(args.image_size)(raw_image)
-                image = image.unsqueeze(0)
-                image = image.to(device)  # [bs, 3, 256, 256]
+        # create validation dataloader
+        validation_path = "datasets/loco/" + args.subdataset + "/validation"
+        validation_set = ImageFolder(validation_path)
 
-                _, map_structure, map_logic = predict(
-                    image, model_stg2, ref_features, args
-                )
+        # calculate quantiles using validation set
+        maps_structure = []
+        maps_logic = []
+        for raw_image, label in tqdm(validation_set):
+            orig_width = raw_image.width
+            orig_height = raw_image.height
+            image = transform_data(args.image_size)(raw_image)
+            image = image.unsqueeze(0)
+            image = image.to(device)  # [bs, 3, 256, 256]
 
-                maps_structure.append(map_structure)
-                maps_logic.append(map_logic)
-            maps_structure = torch.cat(maps_structure)
-            maps_logic = torch.cat(maps_logic)
-            q_structure_start = torch.quantile(maps_structure, q=0.9)
-            q_structure_end = torch.quantile(maps_structure, q=0.995)
-            q_logic_start = torch.quantile(maps_logic, q=0.9)
-            q_logic_end = torch.quantile(maps_logic, q=0.995)
+            _, map_structure, map_logic = predict(image, model_stg2, ref_features, args)
+
+            maps_structure.append(map_structure)
+            maps_logic.append(map_logic)
+        maps_structure = torch.cat(maps_structure)
+        maps_logic = torch.cat(maps_logic)
+        q_structure_start = torch.quantile(maps_structure, q=0.9)
+        q_structure_end = torch.quantile(maps_structure, q=0.995)
+        q_logic_start = torch.quantile(maps_logic, q=0.9)
+        q_logic_end = torch.quantile(maps_logic, q=0.995)
 
     print(f"q_structure_start: {q_structure_start}")
     print(f"q_structure_end: {q_structure_end}")
@@ -643,11 +643,11 @@ def train(args, seed):
     --[EVALUATION]--:
     evaluating
     """
-    if args.debug_mode_2:
-        closest_inspect_folder = (
-            f"closest_{timestamp}_{subdataset_mapper[args.subdataset]}"
-        )
-        os.makedirs(closest_inspect_folder)
+    # if args.debug_mode_2:
+    #     closest_inspect_folder = (
+    #         f"closest_{timestamp}_{subdataset_mapper[args.subdataset]}"
+    #     )
+    #     os.makedirs(closest_inspect_folder)
     model_stg2.eval()
     with torch.no_grad():
         for raw_image, path in test_data:
@@ -658,67 +658,67 @@ def train(args, seed):
             image = image.unsqueeze(0)
             image = image.to(device)  # [bs, 3, 256, 256]
 
-            if args.debug_mode_2:
-                max_index = predict(
-                    image,
-                    model_stg2,
-                    ref_features,
-                    args,
-                    q_structure_start=q_structure_start,
-                    q_structure_end=q_structure_end,
-                    q_logic_start=q_logic_start,
-                    q_logic_end=q_logic_end,
-                )
-                test_img = Image.open(path)
-                test_img = test_img.resize((256, 256))
-                path_divided = path.split("/")
-                ano_type = path_divided[-2]
-                img_index = path_divided[-1].split(".png")[0]
-                test_img.save(
-                    os.path.join(closest_inspect_folder, f"{ano_type}_{img_index}.png"),
-                    "PNG",
-                )
+            # if args.debug_mode_2:
+            #     max_index = predict(
+            #         image,
+            #         model_stg2,
+            #         ref_features,
+            #         args,
+            #         q_structure_start=q_structure_start,
+            #         q_structure_end=q_structure_end,
+            #         q_logic_start=q_logic_start,
+            #         q_logic_end=q_logic_end,
+            #     )
+            #     test_img = Image.open(path)
+            #     test_img = test_img.resize((256, 256))
+            #     path_divided = path.split("/")
+            #     ano_type = path_divided[-2]
+            #     img_index = path_divided[-1].split(".png")[0]
+            #     test_img.save(
+            #         os.path.join(closest_inspect_folder, f"{ano_type}_{img_index}.png"),
+            #         "PNG",
+            #     )
 
-                ref_img_path = ref_path[max_index]
-                ref_img = Image.open(ref_img_path)
-                ref_img = ref_img.resize((256, 256))
-                ref_path_divided = ref_img_path.split("/")
-                ref_index = ref_path_divided[-1].split(".png")[0]
-                ref_img.save(
-                    os.path.join(
-                        closest_inspect_folder,
-                        f"{ano_type}_{img_index}_ref_{ref_index}.png",
-                    ),
-                    "PNG",
-                )
+            #     ref_img_path = ref_path[max_index]
+            #     ref_img = Image.open(ref_img_path)
+            #     ref_img = ref_img.resize((256, 256))
+            #     ref_path_divided = ref_img_path.split("/")
+            #     ref_index = ref_path_divided[-1].split(".png")[0]
+            #     ref_img.save(
+            #         os.path.join(
+            #             closest_inspect_folder,
+            #             f"{ano_type}_{img_index}_ref_{ref_index}.png",
+            #         ),
+            #         "PNG",
+            #     )
 
-            else:
-                map_combined, _, _ = predict(
-                    image,
-                    model_stg2,
-                    ref_features,
-                    args,
-                    q_structure_start=q_structure_start,
-                    q_structure_end=q_structure_end,
-                    q_logic_start=q_logic_start,
-                    q_logic_end=q_logic_end,
-                )
+            # else:
+            map_combined, _, _ = predict(
+                image,
+                model_stg2,
+                ref_features,
+                args,
+                q_structure_start=q_structure_start,
+                q_structure_end=q_structure_end,
+                q_logic_start=q_logic_start,
+                q_logic_end=q_logic_end,
+            )
 
-                map_combined = F.interpolate(
-                    map_combined, (orig_height, orig_width), mode="bilinear"
-                )
-                map_combined = (
-                    map_combined[0, 0].cpu().numpy()
-                )  # ready to be saved into .tiff format
+            map_combined = F.interpolate(
+                map_combined, (orig_height, orig_width), mode="bilinear"
+            )
+            map_combined = (
+                map_combined[0, 0].cpu().numpy()
+            )  # ready to be saved into .tiff format
 
-                defect_class = os.path.basename(os.path.dirname(path))
+            defect_class = os.path.basename(os.path.dirname(path))
 
-                if test_output_dir is not None:
-                    img_nm = os.path.split(path)[1].split(".")[0]
-                    if not os.path.exists(os.path.join(test_output_dir, defect_class)):
-                        os.makedirs(os.path.join(test_output_dir, defect_class))
-                    file = os.path.join(test_output_dir, defect_class, img_nm + ".tiff")
-                    tifffile.imwrite(file, map_combined)
+            if test_output_dir is not None:
+                img_nm = os.path.split(path)[1].split(".")[0]
+                if not os.path.exists(os.path.join(test_output_dir, defect_class)):
+                    os.makedirs(os.path.join(test_output_dir, defect_class))
+                file = os.path.join(test_output_dir, defect_class, img_nm + ".tiff")
+                tifffile.imwrite(file, map_combined)
 
 
 if __name__ == "__main__":
