@@ -40,8 +40,8 @@ python -u recontrast_mvtecloco.py \
   --lr_stg2 0.00005 \
   --attn_count 10 \
   --attn_in_deconv \
-  --similarity_priority flatten \
-  --note "similarity first, flatten, fixed_ref 30%" \
+  --similarity_priority pointwise \
+  --note "similarity first, pointwise, fixed_ref 30%" \
   --fixed_ref \
   --fixed_ref_percent 0.3 \
   # --debug_mode \
