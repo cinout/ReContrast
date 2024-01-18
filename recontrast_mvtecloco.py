@@ -252,7 +252,7 @@ def train(args, seed):
     preparing datasets
     """
     if args.fixed_ref:
-        used_ref_count = math.floor(len(train_data) * 0.1)
+        used_ref_count = math.floor(len(train_data) * args.fixed_ref_percent)
         train_ref_dataloader = torch.utils.data.DataLoader(
             list(train_data)[:used_ref_count],
             batch_size=used_ref_count,
@@ -333,6 +333,7 @@ def train(args, seed):
     model_stg2 = model_stg2.to(device)
 
     if args.fixed_ref:
+        # obtain ref's ref_features early in the process
         model_stg2.eval()
         for imgs, label in train_ref_dataloader:
             imgs = imgs.to(device)
@@ -840,6 +841,7 @@ if __name__ == "__main__":
         action="store_true",
         help="if true, then use 10 percent of train images as fixed ref throughout training/validation/eval",
     )
+    parser.add_argument("--fixed_ref_percent", type=float, default=0.1)
     parser.add_argument(
         "--similarity_priority",
         type=str,
