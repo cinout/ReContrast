@@ -21,7 +21,7 @@ eval "$(conda shell.bash hook)"
 conda activate eff
 
 timestamp="20240119_170635_18_13_[sb]_sd10"
-folder_name="simi_pointwise_fixref01_lr_1e_5_SGD/"
+folder_name="simi_pointwise_fixref02_lr_1e_5_SGD/"
 
 python -u mvtec_loco_ad_evaluation/evaluate_experiment.py \
   --object_name "screw_bag" \
