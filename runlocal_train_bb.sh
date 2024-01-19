@@ -9,7 +9,11 @@ python -u recontrast_mvtecloco.py \
   --lr_stg2 0.00001 \
   --attn_in_deconv \
   --attn_count 10 \
+  --similarity_priority pointwise \
+  --note "similarity first, pointwise, fixed_ref 20%, lr=1e-5, SGD" \
   --fixed_ref \
+  --fixed_ref_percent 0.2 \
+  --optimizer SGD \
   # --debug_mode_2 \
   # --logicano_only \
   # --stg2_ckpt outputs/attn10_deconv/output_20240114_225418_59_17_[jb]_sd10/trainings/mvtec_loco/juice_bottle/model_stg2.pth \
