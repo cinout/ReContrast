@@ -6,7 +6,7 @@ python -u recontrast_mvtecloco.py \
   --iters_stg2 10 \
   --logicano_select absolute \
   --num_logicano 10 \
-  --lr_stg2 0.00005 \
+  --lr_stg2 0.00001 \
   --attn_in_deconv \
   --attn_count 10 \
   --fixed_ref \

@@ -12,7 +12,7 @@ _ext
 *.jpg
 *.t
 build/
-runs/
+runs*/
 dist/
 wheels/
 datasets/
