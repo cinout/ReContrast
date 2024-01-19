@@ -233,7 +233,7 @@ class LogicalMaskProducer(nn.Module):
         self.model_stg1 = model_stg1
 
         # from stg2
-        self.channel_reducer = nn.Linear(in_features=2048, out_features=512)
+        # self.channel_reducer = nn.Linear(in_features=2048, out_features=512)
         self.self_att_module = nn.ModuleList(
             [SelfAttentionBlock(dim=4096) for j in range(self.attn_count)]
         )
@@ -563,12 +563,12 @@ class LogicalMaskProducer(nn.Module):
         self.model_stg1.apply(set_bn_eval)
         if mode is True:
             self.model_stg1.train(False)
-            self.channel_reducer.train(True)
+            # self.channel_reducer.train(True)
             self.self_att_module.train(True)
             self.deconv.train(True)
         else:
             self.model_stg1.train(False)
-            self.channel_reducer.train(False)
+            # self.channel_reducer.train(False)
             self.self_att_module.train(False)
             self.deconv.train(False)
         return self

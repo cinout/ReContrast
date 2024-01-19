@@ -10,7 +10,9 @@ from models.de_resnet import (
 )
 from models.recontrast import LogicalMaskProducer, ReContrast
 import argparse
+from torch.optim.lr_scheduler import CosineAnnealingLR
 import copy
+from torch import optim
 from tqdm import tqdm
 import tifffile
 import os
@@ -347,15 +349,31 @@ def train(args, seed):
         --[STAGE 2]--:
         preparing optimizer
         """
-        optimizer = torch.optim.AdamW(
-            list(model_stg2.channel_reducer.parameters())
-            + list(model_stg2.self_att_module.parameters())
-            + list(model_stg2.deconv.parameters()),
-            lr=args.lr_stg2,
-            betas=(0.9, 0.999),
-            weight_decay=1e-5,
-        )
-
+        if args.optimizer == "Adam":
+            # TODO: check if you added new modules
+            optimizer = torch.optim.AdamW(
+                # list(model_stg2.channel_reducer.parameters()) +
+                list(model_stg2.self_att_module.parameters())
+                + list(model_stg2.deconv.parameters()),
+                lr=args.lr_stg2,
+                betas=(0.9, 0.999),
+                weight_decay=1e-5,
+            )
+        elif args.optimizer == "SGD":
+            optimizer = optim.SGD(
+                list(model_stg2.self_att_module.parameters())
+                + list(model_stg2.deconv.parameters()),
+                lr=args.lr_stg2,
+                momentum=0.9,
+                weight_decay=0.00003,
+            )
+            scheduler = CosineAnnealingLR(
+                optimizer=optimizer,
+                eta_min=0.000001,
+                T_max=args.iters_stg2,
+            )
+        else:
+            raise Exception("Unimplemented optimiser")
         """
         --[STAGE 2]--:
         training
@@ -465,6 +483,8 @@ def train(args, seed):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            if args.optimizer == "SGD":
+                scheduler.step()
 
             if iter % 20 == 0:
                 print(
@@ -781,6 +801,7 @@ if __name__ == "__main__":
         default=10,
         help="number of real logical anomalies used in training",
     )
+
     parser.add_argument("--image_size", type=int, default=256)
     parser.add_argument("--iters_stg1", type=int, default=3000)
     parser.add_argument("--iters_stg2", type=int, default=3000)
@@ -848,6 +869,13 @@ if __name__ == "__main__":
         choices=["flatten", "pointwise"],
         default="flatten",
         help="how to calcualte similarity between ref and input",
+    )
+    parser.add_argument(
+        "--optimizer",
+        type=str,
+        choices=["Adam", "SGD"],
+        default="Adam",
+        help="choice of optimizer",
     )
 
     args = parser.parse_args()
