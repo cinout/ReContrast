@@ -500,8 +500,8 @@ class LogicalMaskProducer(nn.Module):
                     x = self.model_stg1.encoder(x)
                     x = self.model_stg1.bottleneck(x)  # [bs, 2048, 8, 8], bs==1 ??
 
-                    # if args.debug_mode_3:
-                    #     return x
+                    if args.debug_mode_3:
+                        return x
 
                     assert ref_features is not None, "ref_features should not be None"
                     if self.loss_mode == "extreme":

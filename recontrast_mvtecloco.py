@@ -334,48 +334,53 @@ def train(args, seed):
     )
     model_stg2 = model_stg2.to(device)
 
-    # if args.debug_mode_3:
-    #     test_path = "datasets/loco/" + args.subdataset + "/test"
-    #     test_data = ImageFolderWithPath(test_path)
+    if args.debug_mode_3:
+        # test_path = "datasets/loco/" + args.subdataset + "/test"
+        # test_data = ImageFolderWithPath(test_path)
 
-    #     model_stg2.eval()
-    #     normal_features = []
-    #     logicano_features = []
-    #     structureano_features = []
-    #     with torch.no_grad():
-    #         for raw_image, path in test_data:
-    #             image = transform_data(args.image_size)(raw_image)
-    #             image = image.unsqueeze(0)
-    #             image = image.to(device)
-    #             x = model_stg2(image, args)
-    #             ano_type = path.split("/")[-2]
-    #             if ano_type == "good":
-    #                 normal_features.append(x)
-    #             elif ano_type == "logical_anomalies":
-    #                 logicano_features.append(x)
-    #             elif ano_type == "structural_anomalies":
-    #                 structureano_features.append(x)
-    #             else:
-    #                 raise Exception("Unimplemented ano_type")
+        train_path = "datasets/loco/" + args.subdataset + "/train"
+        train_data = ImageFolderWithPath(
+            root=train_path, transform=transform_data(args.image_size)
+        )
 
-    #     normal_features = torch.cat(normal_features, dim=0)
-    #     logicano_features = torch.cat(logicano_features, dim=0)
-    #     structureano_features = torch.cat(structureano_features, dim=0)
-    #     print(normal_features.shape)
-    #     print(logicano_features.shape)
-    #     print(structureano_features.shape)
-    #     save_dir_name = f"feature_maps_{args.subdataset}/"
-    #     os.makedirs(save_dir_name)
-    #     with open(os.path.join(save_dir_name, "normal_features.t"), "wb") as f:
-    #         torch.save(normal_features, f)
-    #     with open(os.path.join(save_dir_name, "logic_anomaly_features.t"), "wb") as f:
-    #         torch.save(logicano_features, f)
-    #     with open(
-    #         os.path.join(save_dir_name, "structure_anomaly_features.t"), "wb"
-    #     ) as f:
-    #         torch.save(structureano_features, f)
+        model_stg2.eval()
+        normal_features = []
+        # logicano_features = []
+        # structureano_features = []
+        with torch.no_grad():
+            for raw_image, path in train_data:
+                image = transform_data(args.image_size)(raw_image)
+                image = image.unsqueeze(0)
+                image = image.to(device)
+                x = model_stg2(image, args)
+                ano_type = path.split("/")[-2]
+                if ano_type == "good":
+                    normal_features.append(x)
+                # elif ano_type == "logical_anomalies":
+                #     logicano_features.append(x)
+                # elif ano_type == "structural_anomalies":
+                #     structureano_features.append(x)
+                else:
+                    raise Exception("Unimplemented ano_type")
 
-    #     exit()
+        normal_features = torch.cat(normal_features, dim=0)
+        # logicano_features = torch.cat(logicano_features, dim=0)
+        # structureano_features = torch.cat(structureano_features, dim=0)
+        print(normal_features.shape)
+        # print(logicano_features.shape)
+        # print(structureano_features.shape)
+        save_dir_name = f"feature_maps_{args.subdataset}/"
+        os.makedirs(save_dir_name)
+        with open(os.path.join(save_dir_name, "normal_features.t"), "wb") as f:
+            torch.save(normal_features, f)
+        # with open(os.path.join(save_dir_name, "logic_anomaly_features.t"), "wb") as f:
+        #     torch.save(logicano_features, f)
+        # with open(
+        #     os.path.join(save_dir_name, "structure_anomaly_features.t"), "wb"
+        # ) as f:
+        #     torch.save(structureano_features, f)
+
+        exit()
 
     if args.fixed_ref:
         # obtain ref's ref_features early in the process
