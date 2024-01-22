@@ -339,9 +339,7 @@ def train(args, seed):
         # test_data = ImageFolderWithPath(test_path)
 
         train_path = "datasets/loco/" + args.subdataset + "/train"
-        train_data = ImageFolderWithPath(
-            root=train_path, transform=transform_data(args.image_size)
-        )
+        train_data = ImageFolderWithPath(root=train_path)
 
         model_stg2.eval()
         normal_features = []
