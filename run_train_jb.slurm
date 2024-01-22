@@ -38,12 +38,12 @@ python -u recontrast_mvtecloco.py \
   --logicano_select absolute \
   --num_logicano 10 \
   --lr_stg2 0.00001 \
-  --attn_count 10 \
+  --attn_count 4 \
   --attn_in_deconv \
   --similarity_priority pointwise \
-  --note "similarity first, pointwise, fixed_ref 5%, lr=1e-5" \
+  --note "similarity first, pointwise, fixed_ref 10%, lr=1e-5, attn_count=4" \
   --fixed_ref \
-  --fixed_ref_percent 0.05 \
+  --fixed_ref_percent 0.1 \
   
   # --debug_mode \
   # --debug_logicano_count 20 \
