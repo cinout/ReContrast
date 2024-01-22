@@ -493,7 +493,6 @@ class LogicalMaskProducer(nn.Module):
                     # return x
             else:  # eval on each test image
                 with torch.no_grad():
-                    assert ref_features is not None, "ref_features should not be None"
                     # structural branch
                     stg1_en, stg1_de = self.model_stg1(x)
 
@@ -501,6 +500,10 @@ class LogicalMaskProducer(nn.Module):
                     x = self.model_stg1.encoder(x)
                     x = self.model_stg1.bottleneck(x)  # [bs, 2048, 8, 8], bs==1 ??
 
+                    if args.debug_mode_3:
+                        return x
+
+                    assert ref_features is not None, "ref_features should not be None"
                     if self.loss_mode == "extreme":
                         # find closest ref
                         num_ref = ref_features.shape[0]
