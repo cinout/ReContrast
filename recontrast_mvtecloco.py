@@ -365,11 +365,15 @@ def train(args, seed):
         print(normal_features.shape)
         print(logicano_features.shape)
         print(structureano_features.shape)
-        with open("normal_features.t", "wb") as f:
+        save_dir_name = f"feature_maps_{args.subdataset}/"
+        os.makedirs(save_dir_name)
+        with open(os.path.join(save_dir_name, "normal_features.t"), "wb") as f:
             torch.save(normal_features, f)
-        with open("logic_anomaly_features.t", "wb") as f:
+        with open(os.path.join(save_dir_name, "logic_anomaly_features.t"), "wb") as f:
             torch.save(logicano_features, f)
-        with open("structure_anomaly_features.t", "wb") as f:
+        with open(
+            os.path.join(save_dir_name, "structure_anomaly_features.t"), "wb"
+        ) as f:
             torch.save(structureano_features, f)
 
         exit()
