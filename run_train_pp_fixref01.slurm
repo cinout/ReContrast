@@ -2,14 +2,14 @@
 
 ###SBATCH --partition=gpu-a100
 
-###SBATCH --partition=feit-gpu-a100
-###SBATCH --qos=feit
+#SBATCH --partition=feit-gpu-a100
+#SBATCH --qos=feit
 
-#SBATCH --partition=deeplearn
-#SBATCH --qos=gpgpudeeplearn
-#SBATCH --constraint=dlg4|dlg5
+###SBATCH --partition=deeplearn
+###SBATCH --qos=gpgpudeeplearn
+###SBATCH --constraint=dlg4|dlg5
 
-#SBATCH --job-name="bb"
+#SBATCH --job-name="pp"
 #SBATCH --account=punim1623
 #SBATCH --time=0-04:00:00
 
@@ -30,10 +30,10 @@ set -e
 set -x
 
 python -u recontrast_mvtecloco.py \
-  --subdataset breakfast_box \
+  --subdataset pushpins \
   --seeds 10 \
+  --stg1_ckpt outputs/stg1_only/outputs_20231212_234343_87_4_[pp]_sd10/trainings/mvtec_loco/pushpins/model_stg1.pth \
   --iters_stg2 8000 \
-  --stg1_ckpt outputs/stg1_only/outputs_20231212_234313_77_49_[bb]_sd10/trainings/mvtec_loco/breakfast_box/model_stg1.pth \
   --loss_mode extreme \
   --logicano_select absolute \
   --num_logicano 10 \
@@ -41,11 +41,11 @@ python -u recontrast_mvtecloco.py \
   --attn_count 10 \
   --attn_in_deconv \
   --similarity_priority pointwise \
-  --note "similarity first, pointwise, fixed_ref 10%, lr=1e-5, SGD" \
+  --note "similarity first, pointwise, fixed_ref 5%, lr=1e-5" \
   --fixed_ref \
-  --fixed_ref_percent 0.1 \
-  --optimizer SGD \
-  --debug_mode_3 \
+  --fixed_ref_percent 0.05 \
+  
+  # --debug_mode \
   # --debug_logicano_count 20 \
 
 my-job-stats -a -n -s
