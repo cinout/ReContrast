@@ -14,7 +14,7 @@ python -u recontrast_mvtecloco.py \
   --fixed_ref \
   --fixed_ref_percent 0.2 \
   
-  --debug_mode_3 \
+  # --debug_mode_3 \
   # --logicano_only \
   # --stg2_ckpt outputs/attn10_deconv/output_20240114_225418_59_17_[jb]_sd10/trainings/mvtec_loco/juice_bottle/model_stg2.pth \
 
