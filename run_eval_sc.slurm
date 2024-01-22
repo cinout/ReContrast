@@ -21,7 +21,7 @@ eval "$(conda shell.bash hook)"
 conda activate eff
 
 timestamp="20240123_092702_61_99_[sc]_sd10"
-folder_name="simi_pointwise_fixref005_lr_1e_5_attncount4/"
+folder_name="simi_pointwise_fixref005_lr_1e_5_attncount4"
 
 python -u mvtec_loco_ad_evaluation/evaluate_experiment.py \
   --object_name "splicing_connectors" \
