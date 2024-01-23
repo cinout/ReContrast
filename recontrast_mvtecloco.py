@@ -554,6 +554,10 @@ def train(args, seed):
                 individual_gts = logicano["individual_gts"]
                 logicano_max_ref_index = logicano["max_ref_index"]
                 logicano_ref = ref_features[logicano_max_ref_index]
+                _, _, orig_height, orig_width = overall_gt.shape
+
+                overall_gt = overall_gt.to(device)
+                individual_gts = [item.to(device) for item in individual_gts]
 
                 normal_image = normal["image"]  # already feature map
                 normal_max_ref_index = normal["max_ref_index"]
