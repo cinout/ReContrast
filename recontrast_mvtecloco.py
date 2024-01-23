@@ -255,8 +255,10 @@ def train(args, seed):
     """
     if args.fixed_ref:
         used_ref_count = math.floor(len(train_data) * args.fixed_ref_percent)
+        train_data_list = list(train_data)
+        random.shuffle(train_data_list)
         train_ref_dataloader = torch.utils.data.DataLoader(
-            list(train_data)[:used_ref_count],
+            train_data_list[:used_ref_count],
             batch_size=used_ref_count,
             shuffle=False,
             # num_workers=1,

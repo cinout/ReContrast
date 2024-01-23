@@ -31,17 +31,17 @@ set -x
 
 python -u recontrast_mvtecloco.py \
   --subdataset breakfast_box \
-  --seeds 10 \
+  --seeds 20 \
   --iters_stg2 8000 \
   --stg1_ckpt outputs/stg1_only/outputs_20231212_234313_77_49_[bb]_sd10/trainings/mvtec_loco/breakfast_box/model_stg1.pth \
   --loss_mode extreme \
   --logicano_select absolute \
   --num_logicano 10 \
   --lr_stg2 0.00001 \
-  --attn_count 4 \
+  --attn_count 10 \
   --attn_in_deconv \
   --similarity_priority pointwise \
-  --note "similarity first, pointwise, fixed_ref 10%, lr=1e-5, attn_count=4" \
+  --note "similarity first, pointwise, fixed_ref 10%, lr=1e-5, sd20" \
   --fixed_ref \
   --fixed_ref_percent 0.1 \
   

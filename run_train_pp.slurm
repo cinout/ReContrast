@@ -31,17 +31,17 @@ set -x
 
 python -u recontrast_mvtecloco.py \
   --subdataset pushpins \
-  --seeds 10 \
+  --seeds 20 \
   --stg1_ckpt outputs/stg1_only/outputs_20231212_234343_87_4_[pp]_sd10/trainings/mvtec_loco/pushpins/model_stg1.pth \
   --iters_stg2 8000 \
   --loss_mode extreme \
   --logicano_select absolute \
   --num_logicano 10 \
   --lr_stg2 0.00001 \
-  --attn_count 4 \
+  --attn_count 10 \
   --attn_in_deconv \
   --similarity_priority pointwise \
-  --note "similarity first, pointwise, fixed_ref 10%, lr=1e-5, attn_count=4" \
+  --note "similarity first, pointwise, fixed_ref 10%, lr=1e-5, sd20" \
   --fixed_ref \
   --fixed_ref_percent 0.1 \
   

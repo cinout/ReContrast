@@ -1,6 +1,6 @@
 python -u recontrast_mvtecloco.py \
   --subdataset splicing_connectors \
-  --seeds 10 \
+  --seeds 20 \
   --loss_mode extreme \
   --stg1_ckpt outputs/stg1_only/outputs_20231212_234313_77_49_[bb]_sd10/trainings/mvtec_loco/breakfast_box/model_stg1.pth \
   --stg2_ckpt outputs/attn10_deconv/output_20240114_233125_53_23_[sc]_sd10/trainings/mvtec_loco/splicing_connectors/model_stg2.pth \
