@@ -31,7 +31,7 @@ set -x
 
 python -u recontrast_mvtecloco.py \
   --subdataset juice_bottle \
-  --seeds 20 \
+  --seeds 30 \
   --stg1_ckpt outputs/stg1_only/output_20240123_141224_0_55_[jb]_sd10/trainings/mvtec_loco/juice_bottle/model_stg1.pth \
   --iters_stg2 8000 \
   --loss_mode extreme \
@@ -41,7 +41,7 @@ python -u recontrast_mvtecloco.py \
   --attn_count 10 \
   --attn_in_deconv \
   --similarity_priority pointwise \
-  --note "similarity first, pointwise, fixed_ref 10%, lr=1e-5, sd20" \
+  --note "similarity first, pointwise, fixed_ref 10%, lr=1e-5, sd30" \
   --fixed_ref \
   --fixed_ref_percent 0.1 \
   
