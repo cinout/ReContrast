@@ -32,7 +32,7 @@ set -x
 python -u recontrast_mvtecloco.py \
   --subdataset screw_bag \
   --seeds 20 \
-  --stg1_ckpt outputs/stg1_only/outputs_20231212_234343_9_7_[sb]_sd10/trainings/mvtec_loco/screw_bag/model_stg1.pth \
+  --stg1_ckpt outputs/stg1_only/output_20240123_153934_58_2_[sb]_sd10/trainings/mvtec_loco/screw_bag/model_stg1.pth \
   --iters_stg2 8000 \
   --loss_mode extreme \
   --logicano_select absolute \

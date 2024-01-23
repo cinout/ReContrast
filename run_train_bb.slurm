@@ -33,7 +33,7 @@ python -u recontrast_mvtecloco.py \
   --subdataset breakfast_box \
   --seeds 20 \
   --iters_stg2 8000 \
-  --stg1_ckpt outputs/stg1_only/outputs_20231212_234313_77_49_[bb]_sd10/trainings/mvtec_loco/breakfast_box/model_stg1.pth \
+  --stg1_ckpt outputs/stg1_only/output_20240123_141224_61_24_[bb]_sd10/trainings/mvtec_loco/breakfast_box/model_stg1.pth \
   --loss_mode extreme \
   --logicano_select absolute \
   --num_logicano 10 \
