@@ -74,6 +74,18 @@ def get_strong_transforms(size, isize, mean_train=None, std_train=None):
     return data_transforms
 
 
+class MyDummyDataset(Dataset):
+    def __init__(self, data):
+        super().__init__()
+        self.data = data
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, index):
+        return self.data[index]
+
+
 class LogicalAnomalyDataset(Dataset):
     def __init__(
         self, logicano_select, num_logicano, percent_logicano, subdataset, image_size

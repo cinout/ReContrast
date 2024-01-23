@@ -10,7 +10,7 @@ python -u recontrast_mvtecloco.py \
   --attn_in_deconv \
   --attn_count 10 \
   --similarity_priority pointwise \
-  --note "similarity first, pointwise, fixed_ref 20%, lr=1e-5, SGD" \
+  --note "" \
   --fixed_ref \
   --fixed_ref_percent 0.1 \
   

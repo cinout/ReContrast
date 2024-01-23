@@ -20,7 +20,7 @@ from datetime import datetime
 from functools import partial
 from torch.nn import functional as F
 from scipy.ndimage import gaussian_filter
-from dataset import transform_data, LogicalAnomalyDataset
+from dataset import transform_data, LogicalAnomalyDataset, MyDummyDataset
 from utils import FocalLoss, IndividualGTLoss
 from torch.utils.tensorboard import SummaryWriter
 from PIL import Image
@@ -162,7 +162,9 @@ def train(args, seed):
     os.makedirs(test_output_dir)
 
     train_path = "datasets/loco/" + args.subdataset + "/train"
-    train_data = ImageFolder(root=train_path, transform=transform_data(args.image_size))
+    train_data = ImageFolderWithPath(
+        root=train_path, transform=transform_data(args.image_size)
+    )
     print(f"train image number: {len(train_data)}")
 
     if args.stg1_ckpt is None:
@@ -272,6 +274,8 @@ def train(args, seed):
             # num_workers=1,
             pin_memory=True,
         )
+    train_ref_dataloader_infinite = InfiniteDataloader(train_ref_dataloader)
+
     normal_dataloader = torch.utils.data.DataLoader(
         train_data,
         batch_size=1,
@@ -294,7 +298,6 @@ def train(args, seed):
         pin_memory=True,
     )
 
-    train_ref_dataloader_infinite = InfiniteDataloader(train_ref_dataloader)
     logicano_dataloader_infinite = InfiniteDataloader(logicano_dataloader)
     normal_dataloader_infinite = InfiniteDataloader(normal_dataloader)
 
@@ -386,14 +389,16 @@ def train(args, seed):
         # obtain ref's ref_features early in the process
         model_stg2.eval()
         ref_features = []
-        for imgs, label in train_ref_dataloader:
+        ref_path_names = []
+        for imgs, path in train_ref_dataloader:
             imgs = imgs.to(device)
             batch_ref_features = model_stg2(
                 imgs, get_ref_features=True, args=args
             )  # [10%, 512, 8, 8]
             ref_features.append(batch_ref_features)
-        ref_features = torch.cat(ref_features, dim=0)
+            ref_path_names = ref_path_names + list(path)
 
+        ref_features = torch.cat(ref_features, dim=0)
         num_ref = ref_features.shape[0]
 
         # find closest ref here
@@ -424,23 +429,28 @@ def train(args, seed):
                 if sim > max_sim:
                     max_sim = sim
                     max_index = i
-
             logicano["image"] = logicano_image
             logicano["max_ref_index"] = max_index
 
             logicanos_for_train.append(logicano)
-
         normals_for_train = []
         for normal in normal_dataloader:
             max_sim = -1000
             max_index = None
 
-            normal_image, label2 = normal
+            normal_image, img_path = normal
             normal_image = normal_image.to(device)
             normal_image = model_stg2.model_stg1.encoder(normal_image)
             normal_image = model_stg2.model_stg1.bottleneck(normal_image)
 
             for i in range(num_ref):
+                ref_path = ref_path_names[i]
+                ref_path = ref_path.split("/")[-1]
+                img_path = img_path[0].split("/")[-1]
+                if ref_path == img_path:
+                    # should not be the same image
+                    continue
+
                 ref_feature = ref_features[i]
 
                 if args.similarity_priority == "pointwise":
@@ -455,7 +465,6 @@ def train(args, seed):
             normals_for_train.append(
                 {"image": normal_image, "max_ref_index": max_index}
             )
-            pass
 
         model_stg2.train()
 
@@ -531,8 +540,31 @@ def train(args, seed):
         #     logicano_fixed_dataloader_infinite = InfiniteDataloader(logicano_fixed)
         #     normal_fixed_dataloader_infinite = InfiniteDataloader(normal_fixed)
         if args.fixed_ref:
-            logicano_dataloader_infinite = InfiniteDataloader(logicanos_for_train)
-            normal_dataloader_infinite = InfiniteDataloader(normals_for_train)
+            logicanos_for_train = MyDummyDataset(logicanos_for_train)
+            normals_for_train = MyDummyDataset(normals_for_train)
+
+            logicanos_for_train_dataloader = torch.utils.data.DataLoader(
+                logicanos_for_train,
+                batch_size=1,
+                shuffle=True,
+                num_workers=0,
+                drop_last=False,
+            )
+
+            normals_for_train_dataloader = torch.utils.data.DataLoader(
+                normals_for_train,
+                batch_size=1,
+                shuffle=True,
+                num_workers=0,
+                drop_last=False,
+            )
+
+            logicano_dataloader_infinite = InfiniteDataloader(
+                logicanos_for_train_dataloader
+            )
+            normal_dataloader_infinite = InfiniteDataloader(
+                normals_for_train_dataloader
+            )
 
         for iter, refs, logicano, normal in zip(
             tqdm_obj,
@@ -547,20 +579,20 @@ def train(args, seed):
             # else normal_dataloader_infinite,
         ):
             if args.fixed_ref:
-                logicano_image = logicano[
-                    "image"
+                logicano_image = logicano["image"][
+                    0
                 ]  # already feature map, [1, 2048, 8, 8]
-                overall_gt = logicano["overall_gt"]  # [1, 1, orig.h, orig.w]
-                individual_gts = logicano["individual_gts"]
-                logicano_max_ref_index = logicano["max_ref_index"]
+                overall_gt = logicano["overall_gt"][0]  # [1, 1, orig.h, orig.w]
+                individual_gts = logicano["individual_gts"][0]
+                logicano_max_ref_index = logicano["max_ref_index"][0]
                 logicano_ref = ref_features[logicano_max_ref_index]
                 _, _, orig_height, orig_width = overall_gt.shape
 
                 overall_gt = overall_gt.to(device)
                 individual_gts = [item.to(device) for item in individual_gts]
 
-                normal_image = normal["image"]  # already feature map
-                normal_max_ref_index = normal["max_ref_index"]
+                normal_image = normal["image"][0]  # already feature map
+                normal_max_ref_index = normal["max_ref_index"][0]
                 normal_ref = ref_features[normal_max_ref_index]
 
                 logicano_input = torch.cat([logicano_ref, logicano_image[0]])
