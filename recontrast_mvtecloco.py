@@ -249,6 +249,9 @@ def train(args, seed):
         model_stg1_dict = model_stg1.state_dict()
         torch.save(model_stg1_dict, os.path.join(train_output_dir, f"model_stg1.pth"))
 
+    # TODO: remove later
+    exit()
+
     """
     --[STAGE 2]--:
     preparing datasets
