@@ -249,9 +249,6 @@ def train(args, seed):
         model_stg1_dict = model_stg1.state_dict()
         torch.save(model_stg1_dict, os.path.join(train_output_dir, f"model_stg1.pth"))
 
-    # TODO: remove later
-    exit()
-
     """
     --[STAGE 2]--:
     preparing datasets
@@ -262,7 +259,7 @@ def train(args, seed):
         random.shuffle(train_data_list)
         train_ref_dataloader = torch.utils.data.DataLoader(
             train_data_list[:used_ref_count],
-            batch_size=used_ref_count,
+            batch_size=32,
             shuffle=False,
             # num_workers=1,
             pin_memory=True,
@@ -292,7 +289,7 @@ def train(args, seed):
     logicano_dataloader = torch.utils.data.DataLoader(
         logicano_data,
         batch_size=1,
-        shuffle=False if args.debug_mode else True,
+        shuffle=True,
         # num_workers=1,
         pin_memory=True,
     )
@@ -388,11 +385,78 @@ def train(args, seed):
     if args.fixed_ref:
         # obtain ref's ref_features early in the process
         model_stg2.eval()
+        ref_features = []
         for imgs, label in train_ref_dataloader:
             imgs = imgs.to(device)
-            ref_features = model_stg2(
+            batch_ref_features = model_stg2(
                 imgs, get_ref_features=True, args=args
             )  # [10%, 512, 8, 8]
+            ref_features.append(batch_ref_features)
+        ref_features = torch.cat(ref_features, dim=0)
+
+        num_ref = ref_features.shape[0]
+
+        # find closest ref here
+        logicanos_for_train = []
+        for logicano in logicano_dataloader:
+            max_sim = -1000
+            max_index = None
+
+            logicano_image = logicano["image"]
+            logicano_image = logicano_image.to(device)
+            logicano_image = model_stg2.model_stg1.encoder(logicano_image)
+            logicano_image = model_stg2.model_stg1.bottleneck(logicano_image)
+
+            for i in range(num_ref):
+                ref_feature = ref_features[i]
+
+                if args.similarity_priority == "pointwise":
+                    sim = F.cosine_similarity(ref_feature, logicano_image, dim=0).mean()
+                # elif args.similarity_priority == "flatten":
+                #     sim = F.cosine_similarity(
+                #         torch.mean(ref, dim=(1, 2)),
+                #         torch.mean(logicano, dim=(1, 2)),
+                #         dim=0,
+                #     )
+                else:
+                    raise Exception("Unimplemented similarity_priority")
+
+                if sim > max_sim:
+                    max_sim = sim
+                    max_index = i
+
+            logicano["image"] = logicano_image
+            logicano["max_ref_index"] = max_index
+
+            logicanos_for_train.append(logicano)
+
+        normals_for_train = []
+        for normal in normal_dataloader:
+            max_sim = -1000
+            max_index = None
+
+            normal_image, label2 = normal
+            normal_image = normal_image.to(device)
+            normal_image = model_stg2.model_stg1.encoder(normal_image)
+            normal_image = model_stg2.model_stg1.bottleneck(normal_image)
+
+            for i in range(num_ref):
+                ref_feature = ref_features[i]
+
+                if args.similarity_priority == "pointwise":
+                    sim = F.cosine_similarity(ref_feature, normal_image, dim=0).mean()
+                else:
+                    raise Exception("Unimplemented similarity_priority")
+
+                if sim > max_sim:
+                    max_sim = sim
+                    max_index = i
+
+            normals_for_train.append(
+                {"image": normal_image, "max_ref_index": max_index}
+            )
+            pass
+
         model_stg2.train()
 
     if args.stg2_ckpt is None:
@@ -466,6 +530,9 @@ def train(args, seed):
 
         #     logicano_fixed_dataloader_infinite = InfiniteDataloader(logicano_fixed)
         #     normal_fixed_dataloader_infinite = InfiniteDataloader(normal_fixed)
+        if args.fixed_ref:
+            logicano_dataloader_infinite = InfiniteDataloader(logicanos_for_train)
+            normal_dataloader_infinite = InfiniteDataloader(normals_for_train)
 
         for iter, refs, logicano, normal in zip(
             tqdm_obj,
@@ -479,38 +546,50 @@ def train(args, seed):
             # if args.debug_mode
             # else normal_dataloader_infinite,
         ):
-            ref_images, label1 = refs
-            normal_image, label2 = normal
-            logicano_image = logicano["image"]
-            overall_gt = logicano["overall_gt"]  # [1, 1, orig.h, orig.w]
-            individual_gts = logicano["individual_gts"]
-            _, _, orig_height, orig_width = overall_gt.shape
+            if args.fixed_ref:
+                logicano_image = logicano[
+                    "image"
+                ]  # already feature map, [1, 2048, 8, 8]
+                overall_gt = logicano["overall_gt"]  # [1, 1, orig.h, orig.w]
+                individual_gts = logicano["individual_gts"]
+                logicano_max_ref_index = logicano["max_ref_index"]
+                logicano_ref = ref_features[logicano_max_ref_index]
 
-            ref_images = ref_images.to(device)
-            normal_image = normal_image.to(device)
-            logicano_image = logicano_image.to(device)
-            overall_gt = overall_gt.to(device)
-            individual_gts = [item.to(device) for item in individual_gts]
+                normal_image = normal["image"]  # already feature map
+                normal_max_ref_index = normal["max_ref_index"]
+                normal_ref = ref_features[normal_max_ref_index]
 
-            if args.logicano_only:
-                if args.fixed_ref:
-                    image_batch = logicano_image
-                else:
-                    image_batch = torch.cat([ref_images, logicano_image])
+                logicano_input = torch.cat([logicano_ref, logicano_image[0]])
+                normal_input = torch.cat([normal_ref, normal_image[0]])
+
+                input = torch.stack(
+                    [logicano_input, normal_input], dim=0
+                )  # shape: [2, 4096, 8, 8]
+
+                predicted_masks = model_stg2(input, args=args)
             else:
-                if args.fixed_ref:
-                    image_batch = torch.cat([logicano_image, normal_image])
+                ref_images, label1 = refs
+                normal_image, label2 = normal
+                logicano_image = logicano["image"]
+                overall_gt = logicano["overall_gt"]  # [1, 1, orig.h, orig.w]
+                individual_gts = logicano["individual_gts"]
+                _, _, orig_height, orig_width = overall_gt.shape
+
+                ref_images = ref_images.to(device)
+                normal_image = normal_image.to(device)
+                logicano_image = logicano_image.to(device)
+                overall_gt = overall_gt.to(device)
+                individual_gts = [item.to(device) for item in individual_gts]
+
+                if args.logicano_only:
+                    image_batch = torch.cat([ref_images, logicano_image])
                 else:
                     image_batch = torch.cat([ref_images, logicano_image, normal_image])
 
-            if args.fixed_ref:
-                predicted_masks = model_stg2(
-                    image_batch, args=args, ref_features=ref_features
-                )
-            else:
                 predicted_masks = model_stg2(
                     image_batch, args=args
                 )  # [2, 2, 256, 256], bs(1) logical_ano, bs(2) normal, both softmaxed
+
             predicted_masks = F.interpolate(
                 predicted_masks, (orig_height, orig_width), mode="bilinear"
             )
