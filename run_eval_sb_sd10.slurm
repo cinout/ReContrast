@@ -2,7 +2,7 @@
 
 #SBATCH --partition=cascade
 
-#SBATCH --job-name="eval_bb"
+#SBATCH --job-name="eval_sb"
 #SBATCH --account=punim1623
 #SBATCH --time=0-01:10:00
 
@@ -20,11 +20,11 @@ module purge
 eval "$(conda shell.bash hook)"
 conda activate eff
 
-timestamp="20240123_230421_15_63_[bb]_sd30"
-folder_name="simi_pointwise_fixref01_lr_1e_5_skipself_sd30"
+timestamp="20240124_015155_89_18_[sb]_sd10"
+folder_name="simi_pointwise_fixref_all_lr_1e_5_skipself"
 
 python -u mvtec_loco_ad_evaluation/evaluate_experiment.py \
-  --object_name "breakfast_box" \
+  --object_name "screw_bag" \
   --dataset_base_dir "./datasets/loco/" \
   --anomaly_maps_dir "./outputs/${folder_name}/output_${timestamp}/anomaly_maps/mvtec_loco/" \
   --output_dir "./outputs/${folder_name}/output_${timestamp}/metrics/mvtec_loco/" \
@@ -33,6 +33,6 @@ python -u mvtec_loco_ad_evaluation/evaluate_experiment.py \
   --generate_visual \
 
 ## FIXME: update timestamp
-##Log this job's resource usage stats### 
+##Log this job's resource usage stats###
 my-job-stats -a -n -s
 ##
