@@ -1,13 +1,17 @@
 #!/bin/bash
 
-###SBATCH --partition=gpu-a100
+#SBATCH --partition=gpu-a100
 
-#SBATCH --partition=feit-gpu-a100
-#SBATCH --qos=feit
+###SBATCH --partition=feit-gpu-a100
+###SBATCH --qos=feit
 
 ###SBATCH --partition=deeplearn
 ###SBATCH --qos=gpgpudeeplearn
 ###SBATCH --constraint=dlg4|dlg5
+
+#SBATCH --job-name="sc"
+#SBATCH --account=punim1623
+#SBATCH --time=0-02:00:00
 
 #SBATCH --job-name="pp"
 #SBATCH --account=punim1623
