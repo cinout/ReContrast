@@ -41,9 +41,10 @@ python -u recontrast_mvtecloco.py \
   --attn_count 10 \
   --attn_in_deconv \
   --similarity_priority pointwise \
-  --note "similarity first, pointwise, fixed_ref 5%" \
+  --note "similarity first, pointwise, fixed_ref 10%, compress_bn" \
   --fixed_ref \
-  --fixed_ref_percent 0.05 \
+  --fixed_ref_percent 0.1 \
+  --compress_bn \
   
   # --debug_mode \
   # --debug_logicano_count 20 \

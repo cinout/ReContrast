@@ -12,7 +12,8 @@ python -u recontrast_mvtecloco.py \
   --similarity_priority pointwise \
   --note "" \
   --fixed_ref \
-  --fixed_ref_percent 0.1 \
+  --fixed_ref_percent 0.01 \
+  --compress_bn \
   
   # --debug_mode_3 \
   # --logicano_only \

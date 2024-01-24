@@ -151,24 +151,40 @@ class DeConv(nn.Module):
         attn_in_deconv=False,
         in_dim=4096,
         out_dim=2,
+        compress_bn=False,
     ):
         super().__init__()
         self.relu = nn.ReLU(inplace=True)
         self.dropout = nn.Dropout(0.1)
         self.attn_in_deconv = attn_in_deconv
+        self.compress_bn = compress_bn
 
-        self.dec_1 = nn.ConvTranspose2d(
-            in_channels=in_dim, out_channels=512, kernel_size=2, stride=2
-        )
-        self.dec_2 = nn.ConvTranspose2d(
-            in_channels=512, out_channels=64, kernel_size=4, stride=4
-        )
-        self.dec_3 = nn.ConvTranspose2d(
-            in_channels=64, out_channels=8, kernel_size=2, stride=2
-        )
-        self.dec_4 = nn.ConvTranspose2d(
-            in_channels=8, out_channels=out_dim, kernel_size=2, stride=2
-        )
+        if compress_bn:
+            self.dec_1 = nn.ConvTranspose2d(
+                in_channels=in_dim, out_channels=512, kernel_size=4, stride=4
+            )
+            self.dec_2 = nn.ConvTranspose2d(
+                in_channels=512, out_channels=64, kernel_size=4, stride=4
+            )
+            self.dec_3 = nn.ConvTranspose2d(
+                in_channels=64, out_channels=8, kernel_size=4, stride=4
+            )
+            self.dec_4 = nn.ConvTranspose2d(
+                in_channels=8, out_channels=out_dim, kernel_size=4, stride=4
+            )
+        else:
+            self.dec_1 = nn.ConvTranspose2d(
+                in_channels=in_dim, out_channels=512, kernel_size=2, stride=2
+            )
+            self.dec_2 = nn.ConvTranspose2d(
+                in_channels=512, out_channels=64, kernel_size=4, stride=4
+            )
+            self.dec_3 = nn.ConvTranspose2d(
+                in_channels=64, out_channels=8, kernel_size=2, stride=2
+            )
+            self.dec_4 = nn.ConvTranspose2d(
+                in_channels=8, out_channels=out_dim, kernel_size=2, stride=2
+            )
         if self.attn_in_deconv:
             self.attn_module_1 = nn.ModuleList(
                 [SelfAttentionBlock(dim=512) for j in range(4)]
@@ -213,31 +229,62 @@ class DeConv(nn.Module):
         return x
 
 
+class BN_Compressor(nn.Module):
+    def __init__(self, in_dim=4096) -> None:
+        super().__init__()
+        self.conv1 = nn.Conv2d(
+            in_channels=in_dim, out_channels=2048, kernel_size=2, stride=2, padding=0
+        )
+        self.relu1 = nn.ReLU()
+        self.conv2 = nn.Conv2d(
+            in_channels=2048, out_channels=1024, kernel_size=2, stride=2, padding=0
+        )
+        self.relu2 = nn.ReLU()
+        self.conv3 = nn.Conv2d(
+            in_channels=1024, out_channels=1024, kernel_size=2, stride=2, padding=0
+        )
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.relu1(x)
+        x = self.conv2(x)
+        x = self.relu2(x)
+        x = self.conv3(x)
+        return x
+
+
 class LogicalMaskProducer(nn.Module):
     def __init__(
         self,
         model_stg1,
-        logicano_only=False,
-        loss_mode="extreme",
-        attn_count=4,
-        attn_in_deconv=False,
+        args,
     ) -> None:
         super().__init__()
         # choices
-        self.logicano_only = logicano_only
-        self.loss_mode = loss_mode
-        self.attn_count = attn_count
-        self.attn_in_deconv = attn_in_deconv
+        self.logicano_only = args.logicano_only
+        self.loss_mode = args.loss_mode
+        self.attn_count = args.attn_count
+        self.attn_in_deconv = args.attn_in_deconv
+        self.compress_bn = args.compress_bn
 
         # from stg1
         self.model_stg1 = model_stg1
 
         # from stg2
         # self.channel_reducer = nn.Linear(in_features=2048, out_features=512)
-        self.self_att_module = nn.ModuleList(
-            [SelfAttentionBlock(dim=4096) for j in range(self.attn_count)]
+
+        if self.compress_bn:
+            self.bn_compressor = BN_Compressor(in_dim=4096)
+        else:
+            self.self_att_module = nn.ModuleList(
+                [SelfAttentionBlock(dim=4096) for j in range(self.attn_count)]
+            )
+
+        self.deconv = DeConv(
+            attn_in_deconv=self.attn_in_deconv,
+            in_dim=1024 if self.compress_bn else 4096,
+            compress_bn=self.compress_bn,
         )
-        self.deconv = DeConv(attn_in_deconv=self.attn_in_deconv)
 
         # prevent gradients
         for param in self.model_stg1.parameters():
@@ -313,14 +360,17 @@ class LogicalMaskProducer(nn.Module):
                         [logicano_input, normal_input], dim=0
                     )  # shape: [2, 4096, 8, 8]
 
-                # pass through attention module
-                B, C, H, W = x.shape
-                x = x.reshape(B, C, -1)
-                x = x.permute(0, 2, 1)
-                for blk in self.self_att_module:
-                    x = blk(x, H, W)
-                x = x.permute(0, 1, 2)
-                x = x.reshape(B, C, H, W)  # [2, 4096, 8, 8]
+                if self.compress_bn:
+                    x = self.bn_compressor(x)  # [2, 4096, 1, 1]
+                else:
+                    # pass through attention module
+                    B, C, H, W = x.shape
+                    x = x.reshape(B, C, -1)
+                    x = x.permute(0, 2, 1)
+                    for blk in self.self_att_module:
+                        x = blk(x, H, W)
+                    x = x.permute(0, 1, 2)
+                    x = x.reshape(B, C, H, W)  # [2, 4096, 8, 8]
 
                 x = self.deconv(x)
                 x = torch.softmax(x, dim=1)
@@ -378,14 +428,17 @@ class LogicalMaskProducer(nn.Module):
                             0
                         )  # [1, 4096, 8, 8]
 
-                        # pass through attention module
-                        B, C, H, W = x.shape
-                        x = x.reshape(B, C, -1)
-                        x = x.permute(0, 2, 1)
-                        for blk in self.self_att_module:
-                            x = blk(x, H, W)
-                        x = x.permute(0, 1, 2)
-                        x = x.reshape(B, C, H, W)  # [1, 4096, 8, 8]
+                        if self.compress_bn:
+                            x = self.bn_compressor(x)  # [2, 4096, 1, 1]
+                        else:
+                            # pass through attention module
+                            B, C, H, W = x.shape
+                            x = x.reshape(B, C, -1)
+                            x = x.permute(0, 2, 1)
+                            for blk in self.self_att_module:
+                                x = blk(x, H, W)
+                            x = x.permute(0, 1, 2)
+                            x = x.reshape(B, C, H, W)  # [1, 4096, 8, 8]
 
                         x = self.deconv(x)
                         x = torch.softmax(x, dim=1)
@@ -400,12 +453,18 @@ class LogicalMaskProducer(nn.Module):
         if mode is True:
             self.model_stg1.train(False)
             # self.channel_reducer.train(True)
-            self.self_att_module.train(True)
+            if self.compress_bn:
+                self.bn_compressor.train(True)
+            else:
+                self.self_att_module.train(True)
             self.deconv.train(True)
         else:
             self.model_stg1.train(False)
             # self.channel_reducer.train(False)
-            self.self_att_module.train(False)
+            if self.compress_bn:
+                self.bn_compressor.train(False)
+            else:
+                self.self_att_module.train(False)
             self.deconv.train(False)
         return self
 

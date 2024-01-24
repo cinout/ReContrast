@@ -332,10 +332,7 @@ def train(args, seed):
 
     model_stg2 = LogicalMaskProducer(
         model_stg1=model_stg1,
-        logicano_only=args.logicano_only,
-        loss_mode=args.loss_mode,
-        attn_count=args.attn_count,
-        attn_in_deconv=args.attn_in_deconv,
+        args=args,
     )
     model_stg2 = model_stg2.to(device)
 
@@ -473,13 +470,18 @@ def train(args, seed):
         --[STAGE 2]--:
         preparing optimizer
         """
+        # TODO: check when you alter modules
+        if args.compress_bn:
+            model_parameters = list(model_stg2.bn_compressor.parameters()) + list(
+                model_stg2.deconv.parameters()
+            )
+        else:
+            model_parameters = list(model_stg2.self_att_module.parameters()) + list(
+                model_stg2.deconv.parameters()
+            )
         # list(model_stg2.channel_reducer.parameters())
-        model_parameters = list(model_stg2.self_att_module.parameters()) + list(
-            model_stg2.deconv.parameters()
-        )
 
         if args.optimizer == "Adam":
-            # TODO: check if you added new modules
             optimizer = torch.optim.AdamW(
                 model_parameters,
                 lr=args.lr_stg2,
@@ -1049,6 +1051,11 @@ if __name__ == "__main__":
         choices=["Adam", "SGD"],
         default="Adam",
         help="choice of optimizer",
+    )
+    parser.add_argument(
+        "--compress_bn",
+        action="store_true",
+        help="if true, then continue compress bottleneck feature to spatial dim of 1",
     )
 
     args = parser.parse_args()
