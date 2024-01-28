@@ -5,7 +5,7 @@ python -u recontrast_mvtecloco.py \
   --stg1_ckpt outputs/stg1_only/outputs_20231212_234313_77_49_[bb]_sd10/trainings/mvtec_loco/breakfast_box/model_stg1.pth \
   --stg2_ckpt outputs/attn10_deconv/output_20240114_225418_59_17_[jb]_sd10/trainings/mvtec_loco/juice_bottle/model_stg2.pth \
   --iters_stg2 10 \
-  --logicano_select absolute \
+  --logicano_select percent \
   --num_logicano 10 \
   --lr_stg2 0.00001 \
   --attn_in_deconv \

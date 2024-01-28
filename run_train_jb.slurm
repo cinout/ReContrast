@@ -35,13 +35,14 @@ python -u recontrast_mvtecloco.py \
   --stg1_ckpt outputs/stg1_only/output_20240123_141224_0_55_[jb]_sd10/trainings/mvtec_loco/juice_bottle/model_stg1.pth \
   --iters_stg2 8000 \
   --loss_mode extreme \
-  --logicano_select absolute \
+  --logicano_select percent \
   --num_logicano 10 \
+  --percent_logicano 1.0 \
   --lr_stg2 0.00001 \
   --attn_count 10 \
   --attn_in_deconv \
   --similarity_priority pointwise \
-  --note "similarity first, pointwise, fixed_ref 10%, compress_bn" \
+  --note "pointwise, 100% logicano, fixed_ref 10%, compress_bn" \
   --fixed_ref \
   --fixed_ref_percent 0.1 \
   --compress_bn \
