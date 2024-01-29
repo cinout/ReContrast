@@ -20,8 +20,8 @@ module purge
 eval "$(conda shell.bash hook)"
 conda activate eff
 
-timestamp="20240124_140103_8_21_[bb]_sd20"
-folder_name="pointwise_fixref01_bncomp"
+timestamp="20240129_110552_9_49_[bb]_sd20"
+folder_name="pointwise_fixref01_bncomp_100p_logicano"
 
 python -u mvtec_loco_ad_evaluation/evaluate_experiment.py \
   --object_name "breakfast_box" \
