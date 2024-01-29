@@ -113,9 +113,6 @@ class LogicalAnomalyDataset(Dataset):
                     k=num_logicano,
                 )
             ]
-        # TODO: remove
-        print(sorted(selected_indices))
-        exit()
         self.images = [logical_anomaly_path + f"/{idx}.png" for idx in selected_indices]
         self.gt = [
             glob.glob(logical_anomaly_gt_path + f"/{idx}/*.png")
